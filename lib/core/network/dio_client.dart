@@ -24,6 +24,10 @@ class DioClient {
   String get baseUrl => _baseUrl;
   String get apiToken => _apiToken;
 
+  String _resolveUrl(String path) {
+    return '$_baseUrl$path';
+  }
+
   void updateConfig({String? baseUrl, String? apiToken}) {
     if (baseUrl != null) {
       _baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), '');
@@ -40,7 +44,7 @@ class DioClient {
   }) async {
     try {
       return await _dio.get<T>(
-        '$_baseUrl$path',
+        _resolveUrl(path),
         queryParameters: queryParameters,
         options: options,
       );
@@ -57,7 +61,7 @@ class DioClient {
   }) async {
     try {
       return await _dio.post<T>(
-        '$_baseUrl$path',
+        _resolveUrl(path),
         data: data,
         queryParameters: queryParameters,
         options: options,
@@ -75,7 +79,7 @@ class DioClient {
   }) async {
     try {
       return await _dio.patch<T>(
-        '$_baseUrl$path',
+        _resolveUrl(path),
         data: data,
         queryParameters: queryParameters,
         options: options,
@@ -93,7 +97,7 @@ class DioClient {
   }) async {
     try {
       return await _dio.delete<T>(
-        '$_baseUrl$path',
+        _resolveUrl(path),
         data: data,
         queryParameters: queryParameters,
         options: options,
