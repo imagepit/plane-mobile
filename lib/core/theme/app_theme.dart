@@ -21,7 +21,7 @@ class AppTheme {
             color: app_colors.AppColorScheme.lightOnSurface,
           ),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 1,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -37,7 +37,7 @@ class AppTheme {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: app_colors.AppColorScheme.lightSurfaceVariant.withAlpha(50),
+          fillColor: app_colors.AppColorScheme.lightSurfaceContainerHighest.withAlpha(50),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
@@ -94,12 +94,12 @@ class AppTheme {
             color: app_colors.AppColorScheme.darkOnSurface,
           ),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 1,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          color: app_colors.AppColorScheme.darkSurfaceVariant.withAlpha(80),
+          color: app_colors.AppColorScheme.darkSurfaceContainerHighest.withAlpha(80),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
           backgroundColor: app_colors.AppColorScheme.darkPrimary,
@@ -110,7 +110,7 @@ class AppTheme {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: app_colors.AppColorScheme.darkSurfaceVariant.withAlpha(50),
+          fillColor: app_colors.AppColorScheme.darkSurfaceContainerHighest.withAlpha(50),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plane_mobile/core/di/injection.dart';
 import 'package:plane_mobile/core/storage/local_storage.dart';
-import 'package:plane_mobile/presentation/blocs/settings/settings_bloc.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});

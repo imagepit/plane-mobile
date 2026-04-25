@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:plane_mobile/domain/entities/work_item.dart';
-import 'package:plane_mobile/core/utils/date_formatter.dart';
 
 class WorkItemProperties extends StatelessWidget {
   final WorkItem workItem;
@@ -60,7 +59,7 @@ class WorkItemProperties extends StatelessWidget {
     return _PropertyRow(
       label: 'State',
       child: DropdownButtonFormField<String>(
-        value: workItem.stateDetail?.id,
+        initialValue: workItem.stateDetail?.id,
         decoration: const InputDecoration(
           isDense: true,
           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -80,7 +79,7 @@ class WorkItemProperties extends StatelessWidget {
     return _PropertyRow(
       label: 'Priority',
       child: DropdownButtonFormField<String>(
-        value: workItem.priority ?? 'none',
+        initialValue: workItem.priority ?? 'none',
         decoration: const InputDecoration(
           isDense: true,
           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),

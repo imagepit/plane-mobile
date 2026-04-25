@@ -18,10 +18,9 @@ class AppColorScheme {
   static const Color lightError = Color(0xFFBA1A1A);
   static const Color lightOnError = Colors.white;
   static const Color lightBackground = Color(0xFFFAFCFF);
-  static const Color lightOnBackground = Color(0xFF1A1C1E);
   static const Color lightSurface = Color(0xFFFAFCFF);
   static const Color lightOnSurface = Color(0xFF1A1C1E);
-  static const Color lightSurfaceVariant = Color(0xFFE0E2EC);
+  static const Color lightSurfaceContainerHighest = Color(0xFFE0E2EC);
   static const Color lightOnSurfaceVariant = Color(0xFF434750);
   static const Color lightOutline = Color(0xFF737784);
   static const Color lightOutlineVariant = Color(0xFFC3C6D0);
@@ -41,10 +40,9 @@ class AppColorScheme {
   static const Color darkError = Color(0xFFFFB4AB);
   static const Color darkOnError = Color(0xFF690005);
   static const Color darkBackground = Color(0xFF0F0F1A);
-  static const Color darkOnBackground = Color(0xFFE3E2E6);
   static const Color darkSurface = Color(0xFF0F0F1A);
   static const Color darkOnSurface = Color(0xFFE3E2E6);
-  static const Color darkSurfaceVariant = Color(0xFF434750);
+  static const Color darkSurfaceContainerHighest = Color(0xFF434750);
   static const Color darkOnSurfaceVariant = Color(0xFFC3C6D0);
   static const Color darkOutline = Color(0xFF8D9099);
   static const Color darkOutlineVariant = Color(0xFF434750);
@@ -64,11 +62,9 @@ class AppColorScheme {
     onTertiaryContainer: lightOnTertiaryContainer,
     error: lightError,
     onError: lightOnError,
-    background: lightBackground,
-    onBackground: lightOnBackground,
     surface: lightSurface,
     onSurface: lightOnSurface,
-    surfaceVariant: lightSurfaceVariant,
+    surfaceContainerHighest: lightSurfaceContainerHighest,
     onSurfaceVariant: lightOnSurfaceVariant,
     outline: lightOutline,
     outlineVariant: lightOutlineVariant,
@@ -89,11 +85,9 @@ class AppColorScheme {
     onTertiaryContainer: darkOnTertiaryContainer,
     error: darkError,
     onError: darkOnError,
-    background: darkBackground,
-    onBackground: darkOnBackground,
     surface: darkSurface,
     onSurface: darkOnSurface,
-    surfaceVariant: darkSurfaceVariant,
+    surfaceContainerHighest: darkSurfaceContainerHighest,
     onSurfaceVariant: darkOnSurfaceVariant,
     outline: darkOutline,
     outlineVariant: darkOutlineVariant,

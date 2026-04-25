@@ -54,7 +54,7 @@ class ServerConfigView extends StatelessWidget {
                 initialUrl: state.lastUrl,
               ),
             SettingsConfigured() => const Center(child: CircularProgressIndicator()),
-            SettingsConnectionSuccess(:final url, :final apiToken) => _buildConnectedView(context, state.userName),
+            SettingsConnectionSuccess() => _buildConnectedView(context, state.userName),
             SettingsConnectionFailure(:final url, :final apiToken, :final error) => ServerConfigForm(
                 initialUrl: url,
                 initialToken: apiToken,

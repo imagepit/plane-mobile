@@ -148,7 +148,7 @@ class _CreateWorkItemPageState extends State<CreateWorkItemPage> {
           )).toList();
     }
     return DropdownButtonFormField<String>(
-      value: _selectedState,
+      initialValue: _selectedState,
       decoration: const InputDecoration(
         labelText: 'State',
         isDense: true,
@@ -160,7 +160,7 @@ class _CreateWorkItemPageState extends State<CreateWorkItemPage> {
 
   Widget _buildPriorityDropdown() {
     return DropdownButtonFormField<String>(
-      value: _selectedPriority,
+      initialValue: _selectedPriority,
       decoration: const InputDecoration(
         labelText: 'Priority',
         isDense: true,

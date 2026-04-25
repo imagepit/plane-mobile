@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:plane_mobile/core/network/dio_client.dart';
 import 'package:plane_mobile/data/models/workspace_model.dart';
 
