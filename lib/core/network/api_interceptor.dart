@@ -11,7 +11,7 @@ class ApiInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final token = _dioClient.apiToken;
     if (token.isNotEmpty) {
-      options.headers['Authorization'] = 'Bearer $token';
+      options.headers['X-Api-Key'] = token;
     }
     handler.next(options);
   }

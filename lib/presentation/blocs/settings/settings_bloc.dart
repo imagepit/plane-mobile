@@ -52,7 +52,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(SettingsTestingConnection(url: event.url, apiToken: event.apiToken));
     try {
       final tempDio = Dio();
-      tempDio.options.headers['Authorization'] = 'Bearer ${event.apiToken}';
+      tempDio.options.headers['X-Api-Key'] = event.apiToken;
       tempDio.options.headers['Content-Type'] = 'application/json';
       final response = await tempDio.get('${event.url}/api/users/me/');
       final name = response.data?['first_name'] ?? response.data?['email'] ?? 'User';
