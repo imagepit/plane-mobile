@@ -46,3 +46,6 @@ app.*.map.json
 
 # Local worktrees (implementation branches)
 worktrees/
+
+# Local smoke-test config (contains the API token; never commit)
+smoke.local.json

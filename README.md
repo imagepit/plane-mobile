@@ -111,6 +111,30 @@ API-token authentication.
 
 To change the configuration later, tap the settings icon on the workspace list page.
 
+## Smoke test
+
+`integration_test/smoke_test.dart` drives the app against a real Plane CE
+instance: settings entry → connection test → workspace/project/work-item
+listing → work item creation → comment → deletion.
+
+1. Copy `smoke.local.json` keys into a local `smoke.local.json` (gitignored) and
+   fill in `SMOKE_API_TOKEN` with your personal access token. **Never commit or
+   paste this file — it holds the token.** Keys: `SMOKE_BASE_URL`,
+   `SMOKE_API_TOKEN`, `SMOKE_WORKSPACE_SLUG`, `SMOKE_PROJECT_ID`,
+   `SMOKE_PROJECT_NAME`.
+2. Use a dedicated test project (not a production one); test work items are
+   created with a `smoke-` title prefix so leftovers can be spotted.
+3. Run:
+
+```bash
+flutter test integration_test/smoke_test.dart \
+  --dart-define-from-file=smoke.local.json -d <device-id>
+```
+
+Do not paste the full command line into logs together with a `--dart-define=`
+token — keep the token in the gitignored file only. The log prints the created
+work item id and HTTP statuses; it must not contain token values.
+
 ## Credential storage
 
 The API token is stored only in the platform secure store (`flutter_secure_storage`:
