@@ -23,13 +23,7 @@ class CommentModel {
       id: json['id'] as String? ?? '',
       commentHtml: json['comment_html'] as String? ?? '',
       comment: json['comment'] as String?,
-      actor: json['actor'] != null
-          ? WorkItemMemberModel.fromJson(
-              json['actor'] as Map<String, dynamic>)
-          : json['actor_detail'] != null
-              ? WorkItemMemberModel.fromJson(
-                  json['actor_detail'] as Map<String, dynamic>)
-              : null,
+      actor: _actorFrom(json),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -37,6 +31,20 @@ class CommentModel {
           ? DateTime.parse(json['updated_at'] as String)
           : null,
     );
+  }
+
+  /// v1 では `actor` は ID文字列。id 付きオブジェクト（旧 `actor_detail`）も受ける。
+  static WorkItemMemberModel? _actorFrom(Map<String, dynamic> json) {
+    for (final key in ['actor', 'actor_detail', 'created_by']) {
+      final value = json[key];
+      if (value is Map<String, dynamic>) {
+        return WorkItemMemberModel.fromJson(value);
+      }
+      if (value is String && value.isNotEmpty) {
+        return WorkItemMemberModel.fromJson({'id': value});
+      }
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() => {

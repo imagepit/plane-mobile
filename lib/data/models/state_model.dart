@@ -25,7 +25,7 @@ class WorkItemStateModel {
       name: json['name'] as String? ?? '',
       color: json['color'] as String?,
       group: json['group'] as String?,
-      sequence: json['sequence'] as int?,
+      sequence: (json['sequence'] as num?)?.toInt(),
       isDefault: json['default'] as bool? ?? false,
       slug: json['slug'] as String?,
     );

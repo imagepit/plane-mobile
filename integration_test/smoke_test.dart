@@ -12,6 +12,13 @@ import 'package:plane_mobile/presentation/widgets/work_item/comment_section.dart
 ///
 /// 実行例（値は smoke.local.json に置く。トークンをログに残さない）:
 /// `flutter test integration_test/smoke_test.dart --dart-define-from-file=smoke.local.json -d <device-id>`
+///
+/// スプラッシュの遷移やネットワーク応答は実時間のため、待ちは実時間で行う。
+Future<void> _wait(WidgetTester tester, {int seconds = 2}) async {
+  await Future<void>.delayed(Duration(seconds: seconds));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -32,9 +39,9 @@ void main() {
     await configureDependencies();
     await sl<LocalStorage>().clearConfig();
 
-    runApp(const app.App());
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pumpAndSettle();
+    // テストのツリーへ載せる（runApp ではファインダーが辿れない）
+    await tester.pumpWidget(const app.App());
+    await _wait(tester, seconds: 4);
 
     // --- 設定画面への入力 ---
     expect(find.text('Server URL'), findsOneWidget, reason: '未設定なら設定画面へ遷移する');
@@ -44,29 +51,30 @@ void main() {
 
     // --- 接続テスト ---
     await tester.tap(find.text('Test Connection'));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await _wait(tester, seconds: 4);
     expect(find.textContaining('Connected as'), findsOneWidget,
         reason: '/api/v1/users/me/ で認証できること');
+    // ignore: avoid_print
     print('SMOKE OK: connection test (/api/v1/users/me/)');
 
-    // 接続テストの成功画面から保存はできないため、設定を保存して確定させる
+    // 接続テストの成功画面からは保存できないため、設定を保存して確定させる
     await tester.tap(find.text('Change server'));
-    await tester.pumpAndSettle();
+    await _wait(tester);
     await tester.enterText(find.byType(TextFormField).at(0), baseUrl);
     await tester.enterText(find.byType(TextFormField).at(1), workspaceSlug);
     await tester.enterText(find.byType(TextFormField).at(2), apiToken);
     await tester.tap(find.text('Save & Connect'));
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pumpAndSettle();
+    await _wait(tester, seconds: 4);
 
     // --- Workspace → Project → Work Items の一覧表示 ---
     expect(find.text(workspaceSlug), findsWidgets, reason: '設定済み slug の Workspace が表示される');
     await tester.tap(find.text(workspaceSlug).first);
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await _wait(tester, seconds: 3);
     expect(find.text(projectName), findsOneWidget, reason: '試験Project が表示される');
     await tester.tap(find.text(projectName));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await _wait(tester, seconds: 3);
     expect(find.text('Work Items'), findsOneWidget);
+    // ignore: avoid_print
     print('SMOKE OK: projects / work items listing');
 
     final dio = sl<DioClient>();
@@ -89,31 +97,55 @@ void main() {
     // --- Work Item 作成 ---
     final title = 'smoke-${DateTime.now().millisecondsSinceEpoch}';
     await tester.tap(find.byType(FloatingActionButton));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await _wait(tester, seconds: 2);
+    final createPage = find.text('Create Work Item');
+    // ignore: avoid_print
+    print('SMOKE DBG: create page present=${createPage.evaluate().isNotEmpty} '
+        'formFields=${find.byType(TextFormField).evaluate().length}');
     await tester.enterText(find.byType(TextFormField).at(0), title);
-    await tester.tap(find.text('Create'));
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    final createButton = find.widgetWithText(TextButton, 'Create');
+    final enabled = createButton.evaluate().isEmpty
+        ? 'button not found'
+        : '${tester.widget<TextButton>(createButton).onPressed != null}';
+    // ignore: avoid_print
+    print('SMOKE DBG: create button found=${createButton.evaluate().length} enabled=$enabled');
+    await tester.tap(createButton);
+    await _wait(tester, seconds: 4);
+    // ignore: avoid_print
+    print('SMOKE DBG: after tap, create page present=${createPage.evaluate().isNotEmpty}');
+    if (createPage.evaluate().isNotEmpty) {
+      final errors = find
+          .byType(Text)
+          .evaluate()
+          .map((e) => (e.widget as Text).data ?? '')
+          .where((d) => d.contains('Please enter'))
+          .toList();
+      // ignore: avoid_print
+      print('SMOKE DBG: validation errors=$errors');
+    }
 
     final createdId = await findItemIdByName(title);
     expect(createdId, isNotNull, reason: '作成した Work Item が API で取得できること');
     // ignore: avoid_print
     print('SMOKE OK: created work item id=$createdId name=$title');
 
-    // 一覧に作成した Work Item が表示される（pull-to-refresh で再読込）
-    await tester.fling(find.byType(ListView).first, const Offset(0, 300), 1000);
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    // 一覧に作成した Work Item が表示される（プロジェクトから開き直して再読込）
+    await tester.pageBack();
+    await _wait(tester, seconds: 2);
+    await tester.tap(find.text(projectName));
+    await _wait(tester, seconds: 3);
     expect(find.text(title), findsOneWidget, reason: '一覧に作成した Work Item が表示される');
 
     // --- コメント投稿 ---
     await tester.tap(find.text(title));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await _wait(tester, seconds: 3);
     final commentBody = 'smoke-comment-${DateTime.now().millisecondsSinceEpoch}';
     await tester.enterText(
       find.descendant(of: find.byType(CommentSection), matching: find.byType(TextField)),
       commentBody,
     );
     await tester.tap(find.byIcon(Icons.send));
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await _wait(tester, seconds: 4);
 
     final commentsRes = await dio.get<Map<String, dynamic>>(
       '/api/v1/workspaces/$workspaceSlug/projects/$projectId/'
@@ -128,11 +160,11 @@ void main() {
 
     // --- 削除（後片付け）---
     await tester.tap(find.byWidgetPredicate((w) => w is PopupMenuButton));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await _wait(tester, seconds: 2);
     await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
+    await _wait(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await _wait(tester, seconds: 4);
 
     expect(await findItemIdByName(title), isNull, reason: '削除後は一覧から消えること');
     // ignore: avoid_print

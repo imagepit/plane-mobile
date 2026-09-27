@@ -41,7 +41,7 @@ class ProjectModel {
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       coverImage: json['cover_image'] as String?,
-      network: json['network'] as String? ?? '',
+      network: json['network']?.toString() ?? '',
       workspace: json['workspace'] as String? ?? '',
       defaultAssignee: json['default_assignee'] as String?,
       memberCount: json['member_count'] as int?,
