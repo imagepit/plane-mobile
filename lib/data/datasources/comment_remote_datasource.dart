@@ -8,13 +8,15 @@ class CommentRemoteDataSource {
 
   /// `/api/v1` の一覧は `results` 付きページング形
   /// （`results` / `next_cursor` / `next_page_results` ほか）で返る。
+  /// `?expand=actor` を付けると `actor` が ID の代わりにオブジェクトで返り、
+  /// 投稿者名を表示できる（2026-09-27 実測）。
   Future<List<CommentModel>> getComments(
     String workspaceSlug,
     String projectId,
     String itemId,
   ) async {
     final response = await _dioClient.get<Map<String, dynamic>>(
-      '/api/v1/workspaces/$workspaceSlug/projects/$projectId/work-items/$itemId/comments/',
+      '/api/v1/workspaces/$workspaceSlug/projects/$projectId/work-items/$itemId/comments/?expand=actor',
     );
     final body = response.data;
     final data = body == null

@@ -134,9 +134,12 @@ class _CommentTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      comment.actor?.fullName ?? 'Unknown',
-                      style: Theme.of(context).textTheme.labelLarge,
+                    Expanded(
+                      child: Text(
+                        comment.actor?.fullName ?? 'Unknown',
+                        style: Theme.of(context).textTheme.labelLarge,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
