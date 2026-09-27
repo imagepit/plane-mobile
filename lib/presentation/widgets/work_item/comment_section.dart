@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:plane_mobile/presentation/widgets/preview/code_block_preview.dart';
 import 'package:plane_mobile/core/utils/date_formatter.dart';
 import 'package:plane_mobile/domain/entities/work_item.dart';
 
@@ -151,10 +151,10 @@ class _CommentTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                HtmlWidget(
-                  (comment.commentHtml.isNotEmpty
-                      ? comment.commentHtml
-                      : comment.comment) ??
+                RichHtml(
+                  html: (comment.commentHtml.isNotEmpty
+                          ? comment.commentHtml
+                          : comment.comment) ??
                       '',
                   textStyle: Theme.of(context).textTheme.bodyMedium,
                 ),

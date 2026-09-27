@@ -111,6 +111,21 @@ API-token authentication.
 
 To change the configuration later, tap the settings icon on the workspace list page.
 
+## Body previews
+
+Work item descriptions and comments render HTML (see above) and additionally
+preview two code block languages, matching redmine-next's rendering:
+
+- `language-file-tree` — IMAGEPIT FileTree rendered natively (markers
+  `++` new / `**` modified / `--` deleted, callouts ` <--[...]`, branch
+  connectors). The format follows `design-system`'s tree notation.
+- `language-mermaid` — Mermaid diagrams rendered in a WebView using the
+  bundled `assets/mermaid/mermaid.min.js` (**mermaid 11.16.0**, the same
+  version as redmine-next; MIT License). No external URLs are loaded; if
+  rendering fails the source text is shown instead.
+
+Code blocks without those language classes render as plain code blocks.
+
 ## Smoke test
 
 `integration_test/smoke_test.dart` drives the app against a real Plane CE
