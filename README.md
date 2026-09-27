@@ -107,6 +107,22 @@ The app stores these credentials locally using Hive and sends them as `Authoriza
 
 To change the configuration later, tap the settings icon on the workspace list page.
 
+## Credential storage
+
+The API token is stored only in the platform secure store (`flutter_secure_storage`:
+iOS Keychain / Android Keystore) and is never written to Hive or other plain
+storage.
+
+- On first launch after upgrading from a version that stored the token in Hive,
+  the legacy `api_token` entry is migrated to the secure store and removed from
+  the Hive box automatically.
+- Persistence goes through await-able paths only: `LocalStorage.saveConfig()` /
+  `CredentialStore.saveToken()`. The synchronous `set apiToken` setter is kept for
+  compatibility but updates the in-memory cache only and does not persist
+  (the settings screen uses `saveConfig()` exclusively).
+- `LocalStorage.clearConfig()` clears both the Hive settings and the secure store
+  entry, so a reset leaves no token behind on the device.
+
 ## Project Structure
 
 - **Data Layer**: Remote data sources call Plane API via Dio; models map JSON to domain entities; repository implementations handle error mapping (DioExceptions → Failures via dartz Either).

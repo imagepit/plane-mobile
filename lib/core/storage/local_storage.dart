@@ -1,8 +1,18 @@
 import 'package:hive/hive.dart';
 import 'package:plane_mobile/core/constants/app_constants.dart';
+import 'package:plane_mobile/core/storage/credential_store.dart';
 
+/// 非機密設定（接続先URL・テーマ・前回の選択）の保存。
+///
+/// API token の保存先は [CredentialStore]（Keychain / Android Keystore）で、
+/// このクラスは Hive に平文で残さない。公開APIは変えず、token の保管だけを
+/// [CredentialStore] へ委譲する。
 class LocalStorage {
+  LocalStorage({required CredentialStore credentialStore})
+      : _credentialStore = credentialStore;
+
   late Box _box;
+  final CredentialStore _credentialStore;
 
   static const _keySelfHostedUrl = 'self_hosted_url';
   static const _keyApiToken = 'api_token';
@@ -12,6 +22,16 @@ class LocalStorage {
 
   Future<void> init() async {
     _box = await Hive.openBox(AppConstants.hiveBoxName);
+    await _migrateLegacyApiToken();
+  }
+
+  /// 旧版が Hive に平文で置いていた `api_token` を [CredentialStore] へ移してから
+  /// 削除する（移行）。移行後は平文が Hive に残らない。
+  Future<void> _migrateLegacyApiToken() async {
+    final legacy = _box.get(_keyApiToken) as String?;
+    if (legacy == null || legacy.isEmpty) return;
+    await _credentialStore.saveToken(legacy);
+    await _box.delete(_keyApiToken);
   }
 
   bool get isConfigured {
@@ -21,29 +41,38 @@ class LocalStorage {
   }
 
   String? get selfHostedUrl => _box.get(_keySelfHostedUrl) as String?;
-  String? get apiToken => _box.get(_keyApiToken) as String?;
-  String? get lastWorkspaceSlug => _box.get(_keyLastWorkspaceSlug) as String?;
-  String? get lastProjectId => _box.get(_keyLastProjectId) as String?;
-  String get themeMode => _box.get(_keyThemeMode) as String? ?? 'system';
 
-  set selfHostedUrl(String? value) => _box.put(_keySelfHostedUrl, value);
-  set apiToken(String? value) => _box.put(_keyApiToken, value);
+  String? get apiToken => _credentialStore.apiToken;
+
+  /// 互換のため残す同期セッター。メモリキャッシュだけを更新し、Hive にも
+  /// Secure Storage にも書かない。永続化は [saveConfig] /
+  /// `CredentialStore.saveToken` 経路のみを使う。
+  set apiToken(String? value) {
+    _credentialStore.apiToken = value;
+  }
+
+  String? get lastWorkspaceSlug => _box.get(_keyLastWorkspaceSlug) as String?;
   set lastWorkspaceSlug(String? value) =>
       _box.put(_keyLastWorkspaceSlug, value);
+  String? get lastProjectId => _box.get(_keyLastProjectId) as String?;
   set lastProjectId(String? value) => _box.put(_keyLastProjectId, value);
+  String get themeMode => _box.get(_keyThemeMode) as String? ?? 'system';
+
   set themeMode(String value) => _box.put(_keyThemeMode, value);
 
+  /// 接続先URLを Hive に、API token を [CredentialStore] に保存する。
   Future<void> saveConfig({
     required String selfHostedUrl,
     required String apiToken,
   }) async {
-    await _box.putAll({
-      _keySelfHostedUrl: selfHostedUrl,
-      _keyApiToken: apiToken,
-    });
+    await _credentialStore.saveToken(apiToken);
+    await _box.put(_keySelfHostedUrl, selfHostedUrl);
   }
 
+  /// 接続設定を消す。API token は [CredentialStore]（Keychain / Android
+  /// Keystore）と Hive の両方から消す。
   Future<void> clearConfig() async {
+    await _credentialStore.clearToken();
     await _box.deleteAll([
       _keySelfHostedUrl,
       _keyApiToken,

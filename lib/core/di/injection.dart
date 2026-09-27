@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:plane_mobile/core/network/dio_client.dart';
+import 'package:plane_mobile/core/storage/credential_store.dart';
 import 'package:plane_mobile/core/storage/local_storage.dart';
 import 'package:plane_mobile/data/datasources/work_item_remote_datasource.dart';
 import 'package:plane_mobile/data/datasources/workspace_remote_datasource.dart';
@@ -36,7 +37,13 @@ final sl = GetIt.instance;
 Future<void> configureDependencies() async {
   sl.registerSingleton<DioClient>(DioClient());
 
-  final localStorage = LocalStorage();
+  // 機密（API token）の保存先。LocalStorage より先に初期化し、
+  // 完了後に isConfigured を見る順序を保つ。
+  final credentialStore = CredentialStore();
+  await credentialStore.init();
+  sl.registerSingleton<CredentialStore>(credentialStore);
+
+  final localStorage = LocalStorage(credentialStore: credentialStore);
   await localStorage.init();
   sl.registerSingleton<LocalStorage>(localStorage);
 
