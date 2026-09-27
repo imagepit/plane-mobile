@@ -8,7 +8,8 @@ class SettingsLoading extends SettingsState {}
 
 class SettingsUnconfigured extends SettingsState {
   final String? lastUrl;
-  SettingsUnconfigured({this.lastUrl});
+  final String? lastSlug;
+  SettingsUnconfigured({this.lastUrl, this.lastSlug});
 }
 
 class SettingsConfigured extends SettingsState {
@@ -19,8 +20,13 @@ class SettingsConfigured extends SettingsState {
 
 class SettingsTestingConnection extends SettingsState {
   final String url;
+  final String workspaceSlug;
   final String apiToken;
-  SettingsTestingConnection({required this.url, required this.apiToken});
+  SettingsTestingConnection({
+    required this.url,
+    required this.workspaceSlug,
+    required this.apiToken,
+  });
 }
 
 class SettingsConnectionSuccess extends SettingsState {
@@ -36,10 +42,12 @@ class SettingsConnectionSuccess extends SettingsState {
 
 class SettingsConnectionFailure extends SettingsState {
   final String url;
+  final String workspaceSlug;
   final String apiToken;
   final String error;
   SettingsConnectionFailure({
     required this.url,
+    required this.workspaceSlug,
     required this.apiToken,
     required this.error,
   });

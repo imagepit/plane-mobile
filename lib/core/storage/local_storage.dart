@@ -16,6 +16,7 @@ class LocalStorage {
 
   static const _keySelfHostedUrl = 'self_hosted_url';
   static const _keyApiToken = 'api_token';
+  static const _keyWorkspaceSlug = 'workspace_slug';
   static const _keyLastWorkspaceSlug = 'last_workspace_slug';
   static const _keyLastProjectId = 'last_project_id';
   static const _keyThemeMode = 'theme_mode';
@@ -42,6 +43,10 @@ class LocalStorage {
 
   String? get selfHostedUrl => _box.get(_keySelfHostedUrl) as String?;
 
+  /// 設定済みの Workspace slug（PAT では列挙できないため手入力で持つ）。
+  String? get workspaceSlug => _box.get(_keyWorkspaceSlug) as String?;
+  set workspaceSlug(String? value) => _box.put(_keyWorkspaceSlug, value);
+
   String? get apiToken => _credentialStore.apiToken;
 
   /// 互換のため残す同期セッター。メモリキャッシュだけを更新し、Hive にも
@@ -60,13 +65,16 @@ class LocalStorage {
 
   set themeMode(String value) => _box.put(_keyThemeMode, value);
 
-  /// 接続先URLを Hive に、API token を [CredentialStore] に保存する。
+  /// 接続先URLと Workspace slug を Hive に、API token を [CredentialStore] に保存する。
+  /// `workspaceSlug` は追加引数（未指定なら空として保存する）。
   Future<void> saveConfig({
     required String selfHostedUrl,
+    String? workspaceSlug,
     required String apiToken,
   }) async {
     await _credentialStore.saveToken(apiToken);
     await _box.put(_keySelfHostedUrl, selfHostedUrl);
+    await _box.put(_keyWorkspaceSlug, workspaceSlug);
   }
 
   /// 接続設定を消す。API token は [CredentialStore]（Keychain / Android
@@ -76,6 +84,7 @@ class LocalStorage {
     await _box.deleteAll([
       _keySelfHostedUrl,
       _keyApiToken,
+      _keyWorkspaceSlug,
       _keyLastWorkspaceSlug,
       _keyLastProjectId,
     ]);

@@ -6,16 +6,20 @@ class CommentRemoteDataSource {
 
   CommentRemoteDataSource(this._dioClient);
 
+  /// `/api/v1` の一覧は `results` 付きページング形
+  /// （`results` / `next_cursor` / `next_page_results` ほか）で返る。
   Future<List<CommentModel>> getComments(
     String workspaceSlug,
     String projectId,
     String itemId,
   ) async {
-    final response = await _dioClient.get<List<dynamic>>(
-      '/api/workspaces/$workspaceSlug/projects/$projectId/work-items/$itemId/comments/',
+    final response = await _dioClient.get<Map<String, dynamic>>(
+      '/api/v1/workspaces/$workspaceSlug/projects/$projectId/work-items/$itemId/comments/',
     );
-    final data = response.data;
-    if (data == null) return [];
+    final body = response.data;
+    final data = body == null
+        ? const <dynamic>[]
+        : (body['results'] as List<dynamic>? ?? const <dynamic>[]);
     return data
         .map((json) => CommentModel.fromJson(json as Map<String, dynamic>))
         .toList();
@@ -28,7 +32,7 @@ class CommentRemoteDataSource {
     String commentHtml,
   ) async {
     final response = await _dioClient.post<Map<String, dynamic>>(
-      '/api/workspaces/$workspaceSlug/projects/$projectId/work-items/$itemId/comments/',
+      '/api/v1/workspaces/$workspaceSlug/projects/$projectId/work-items/$itemId/comments/',
       data: {'comment_html': commentHtml},
     );
     return CommentModel.fromJson(response.data!);

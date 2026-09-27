@@ -58,7 +58,7 @@ Future<void> configureDependencies() async {
     () => WorkItemRemoteDataSource(sl<DioClient>()),
   );
   sl.registerFactory<WorkspaceRemoteDataSource>(
-    () => WorkspaceRemoteDataSource(sl<DioClient>()),
+    () => WorkspaceRemoteDataSource(sl<LocalStorage>()),
   );
   sl.registerFactory<ProjectRemoteDataSource>(
     () => ProjectRemoteDataSource(sl<DioClient>()),

@@ -52,11 +52,13 @@ class ServerConfigView extends StatelessWidget {
             SettingsLoading() => const Center(child: CircularProgressIndicator()),
             SettingsUnconfigured() => ServerConfigForm(
                 initialUrl: state.lastUrl,
+                initialSlug: state.lastSlug,
               ),
             SettingsConfigured() => const Center(child: CircularProgressIndicator()),
             SettingsConnectionSuccess() => _buildConnectedView(context, state.userName),
-            SettingsConnectionFailure(:final url, :final apiToken, :final error) => ServerConfigForm(
+            SettingsConnectionFailure(:final url, :final workspaceSlug, :final apiToken, :final error) => ServerConfigForm(
                 initialUrl: url,
+                initialSlug: workspaceSlug,
                 initialToken: apiToken,
                 initialError: error,
               ),

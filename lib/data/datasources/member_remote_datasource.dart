@@ -6,12 +6,13 @@ class MemberRemoteDataSource {
 
   MemberRemoteDataSource(this._dioClient);
 
+  /// members の一覧だけは `/api/v1` でも生配列で返る（2026-09-27 実測）。
   Future<List<WorkItemMemberModel>> getMembers(
     String workspaceSlug,
     String projectId,
   ) async {
     final response = await _dioClient.get<List<dynamic>>(
-      '/api/workspaces/$workspaceSlug/projects/$projectId/members/',
+      '/api/v1/workspaces/$workspaceSlug/projects/$projectId/members/',
     );
     final data = response.data;
     if (data == null) return [];

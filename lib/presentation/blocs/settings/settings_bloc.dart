@@ -32,7 +32,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       _dioClient.updateConfig(baseUrl: url, apiToken: token);
       emit(SettingsConfigured(url: url, apiToken: token));
     } else {
-      emit(SettingsUnconfigured(lastUrl: _localStorage.selfHostedUrl));
+      emit(SettingsUnconfigured(
+        lastUrl: _localStorage.selfHostedUrl,
+        lastSlug: _localStorage.workspaceSlug,
+      ));
     }
   }
 
@@ -41,6 +44,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(SettingsLoading());
     await _localStorage.saveConfig(
       selfHostedUrl: event.url,
+      workspaceSlug: event.workspaceSlug,
       apiToken: event.apiToken,
     );
     _dioClient.updateConfig(baseUrl: event.url, apiToken: event.apiToken);
@@ -49,12 +53,17 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   Future<void> _onTestConnection(
       TestConnection event, Emitter<SettingsState> emit) async {
-    emit(SettingsTestingConnection(url: event.url, apiToken: event.apiToken));
+    emit(SettingsTestingConnection(
+      url: event.url,
+      workspaceSlug: event.workspaceSlug,
+      apiToken: event.apiToken,
+    ));
     try {
       final tempDio = Dio();
       tempDio.options.headers['X-Api-Key'] = event.apiToken;
       tempDio.options.headers['Content-Type'] = 'application/json';
-      final url = '${event.url}/api/users/me/';
+      // PAT（X-API-Key）が通るのは /api/v1 のみ（旧 /api/ は 401。2026-09-27 実測）
+      final url = '${event.url}/api/v1/users/me/';
       final response = await tempDio.get(url);
       final name = response.data?['first_name'] ?? response.data?['email'] ?? 'User';
       emit(SettingsConnectionSuccess(
@@ -68,12 +77,14 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
           : 'Could not connect to server';
       emit(SettingsConnectionFailure(
         url: event.url,
+        workspaceSlug: event.workspaceSlug,
         apiToken: event.apiToken,
         error: error,
       ));
     } catch (e) {
       emit(SettingsConnectionFailure(
         url: event.url,
+        workspaceSlug: event.workspaceSlug,
         apiToken: event.apiToken,
         error: 'Connection failed: $e',
       ));

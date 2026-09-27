@@ -100,10 +100,14 @@ flutter build ios --release
 
 On first launch, the app displays a server configuration screen where you enter:
 
-1. **Server URL** — Your Plane self-hosted instance URL (e.g., `https://plane.example.com`)
-2. **API Token** — Your personal API token from Plane
+1. **Server URL** — Your Plane self-hosted instance URL (e.g., `https://plane.example.com`, or the private API route such as `http://<host>:8080`)
+2. **Workspace Slug** — The workspace to open (Plane's API has no workspace-list route that accepts a personal access token, so the slug is entered explicitly)
+3. **API Token** — Your personal API token from Plane
 
-The app stores these credentials locally using Hive and sends them as `Authorization: Bearer {token}` on all API requests.
+The app stores the URL and slug locally and the token in the platform secure store
+(see "Credential storage"), and sends the token as `X-Api-Key: {token}` on all API
+requests. The REST API lives under `/api/v1/` — the legacy `/api/` routes reject
+API-token authentication.
 
 To change the configuration later, tap the settings icon on the workspace list page.
 
@@ -131,20 +135,24 @@ storage.
 
 ## API Endpoints Used
 
+All endpoints are under `{BASE_API}/api/v1/` and authenticate with `X-Api-Key`.
+List responses are cursor-paginated objects (`results` / `next_cursor` /
+`next_page_results`), except project members which return a bare array.
+
 | Entity      | Method | Endpoint                                                          |
 |-------------|--------|-------------------------------------------------------------------|
-| Workspaces  | GET    | `/api/workspaces/`                                                |
-| Projects    | GET    | `/api/workspaces/{slug}/projects/`                                |
-| Work Items  | GET    | `/api/workspaces/{slug}/projects/{id}/work-items/`                |
-| Work Items  | POST   | `/api/workspaces/{slug}/projects/{id}/work-items/`                |
-| Work Items  | PATCH  | `/api/workspaces/{slug}/projects/{id}/work-items/{id}/`            |
-| Work Items  | DELETE | `/api/workspaces/{slug}/projects/{id}/work-items/{id}/`            |
-| States      | GET    | `/api/workspaces/{slug}/projects/{id}/states/`                    |
-| Labels      | GET    | `/api/workspaces/{slug}/projects/{id}/labels/`                    |
-| Members     | GET    | `/api/workspaces/{slug}/projects/{id}/members/`                   |
-| Comments    | GET    | `/api/workspaces/{slug}/projects/{id}/work-items/{id}/comments/`   |
-| Comments    | POST   | `/api/workspaces/{slug}/projects/{id}/work-items/{id}/comments/`   |
-| User        | GET    | `/api/users/me/` (used for connection test)                      |
+| Workspaces  | —      | (none: no list route accepts a token; the configured slug is used) |
+| Projects    | GET    | `/api/v1/workspaces/{slug}/projects/`                              |
+| Work Items  | GET    | `/api/v1/workspaces/{slug}/projects/{id}/work-items/?expand=state,assignees,labels` |
+| Work Items  | POST   | `/api/v1/workspaces/{slug}/projects/{id}/work-items/`              |
+| Work Items  | PATCH  | `/api/v1/workspaces/{slug}/projects/{id}/work-items/{id}/`         |
+| Work Items  | DELETE | `/api/v1/workspaces/{slug}/projects/{id}/work-items/{id}/`         |
+| States      | GET    | `/api/v1/workspaces/{slug}/projects/{id}/states/`                  |
+| Labels      | GET    | `/api/v1/workspaces/{slug}/projects/{id}/labels/`                  |
+| Members     | GET    | `/api/v1/workspaces/{slug}/projects/{id}/members/`                 |
+| Comments    | GET    | `/api/v1/workspaces/{slug}/projects/{id}/work-items/{id}/comments/`|
+| Comments    | POST   | `/api/v1/workspaces/{slug}/projects/{id}/work-items/{id}/comments/`|
+| User        | GET    | `/api/v1/users/me/` (used for connection test)                    |
 
 ## Testing
 

@@ -6,15 +6,18 @@ class LabelRemoteDataSource {
 
   LabelRemoteDataSource(this._dioClient);
 
+  /// `/api/v1` の一覧は `results` 付きページング形で返る。
   Future<List<WorkItemLabelModel>> getLabels(
     String workspaceSlug,
     String projectId,
   ) async {
-    final response = await _dioClient.get<List<dynamic>>(
-      '/api/workspaces/$workspaceSlug/projects/$projectId/labels/',
+    final response = await _dioClient.get<Map<String, dynamic>>(
+      '/api/v1/workspaces/$workspaceSlug/projects/$projectId/labels/',
     );
-    final data = response.data;
-    if (data == null) return [];
+    final body = response.data;
+    final data = body == null
+        ? const <dynamic>[]
+        : (body['results'] as List<dynamic>? ?? const <dynamic>[]);
     return data
         .map((json) =>
             WorkItemLabelModel.fromJson(json as Map<String, dynamic>))

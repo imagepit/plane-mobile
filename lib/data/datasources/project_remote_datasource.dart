@@ -6,12 +6,16 @@ class ProjectRemoteDataSource {
 
   ProjectRemoteDataSource(this._dioClient);
 
+  /// `/api/v1` の一覧は `results` 付きページング形（count / next_cursor /
+  /// next_page_results ほか）で返る。
   Future<List<ProjectModel>> getProjects(String workspaceSlug) async {
-    final response = await _dioClient.get<List<dynamic>>(
-      '/api/workspaces/$workspaceSlug/projects/',
+    final response = await _dioClient.get<Map<String, dynamic>>(
+      '/api/v1/workspaces/$workspaceSlug/projects/',
     );
-    final data = response.data;
-    if (data == null) return [];
+    final body = response.data;
+    final data = body == null
+        ? const <dynamic>[]
+        : (body['results'] as List<dynamic>? ?? const <dynamic>[]);
     return data
         .map((json) => ProjectModel.fromJson(json as Map<String, dynamic>))
         .toList();
@@ -19,7 +23,7 @@ class ProjectRemoteDataSource {
 
   Future<ProjectModel> getProject(String workspaceSlug, String projectId) async {
     final response = await _dioClient.get<Map<String, dynamic>>(
-      '/api/workspaces/$workspaceSlug/projects/$projectId/',
+      '/api/v1/workspaces/$workspaceSlug/projects/$projectId/',
     );
     return ProjectModel.fromJson(response.data!);
   }

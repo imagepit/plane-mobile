@@ -4,12 +4,14 @@ import 'package:plane_mobile/presentation/blocs/settings/settings_bloc.dart';
 
 class ServerConfigForm extends StatefulWidget {
   final String? initialUrl;
+  final String? initialSlug;
   final String? initialToken;
   final String? initialError;
 
   const ServerConfigForm({
     super.key,
     this.initialUrl,
+    this.initialSlug,
     this.initialToken,
     this.initialError,
   });
@@ -21,6 +23,7 @@ class ServerConfigForm extends StatefulWidget {
 class _ServerConfigFormState extends State<ServerConfigForm> {
   final _formKey = GlobalKey<FormState>();
   final _urlController = TextEditingController();
+  final _slugController = TextEditingController();
   final _tokenController = TextEditingController();
   bool _obscureToken = true;
 
@@ -30,6 +33,9 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
     if (widget.initialUrl != null) {
       _urlController.text = widget.initialUrl!;
     }
+    if (widget.initialSlug != null) {
+      _slugController.text = widget.initialSlug!;
+    }
     if (widget.initialToken != null) {
       _tokenController.text = widget.initialToken!;
     }
@@ -38,6 +44,7 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
   @override
   void dispose() {
     _urlController.dispose();
+    _slugController.dispose();
     _tokenController.dispose();
     super.dispose();
   }
@@ -95,6 +102,23 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
             ),
             const SizedBox(height: 16),
             TextFormField(
+              controller: _slugController,
+              decoration: const InputDecoration(
+                labelText: 'Workspace Slug',
+                hintText: 'e.g. my-workspace',
+                prefixIcon: Icon(Icons.workspaces_outlined),
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your workspace slug';
+                }
+                return null;
+              },
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
               controller: _tokenController,
               obscureText: _obscureToken,
               decoration: InputDecoration(
@@ -145,6 +169,7 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
     if (_formKey.currentState!.validate()) {
       context.read<SettingsBloc>().add(TestConnection(
             url: _urlController.text.trim(),
+            workspaceSlug: _slugController.text.trim(),
             apiToken: _tokenController.text.trim(),
           ));
     }
@@ -154,6 +179,7 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
     if (_formKey.currentState!.validate()) {
       context.read<SettingsBloc>().add(SaveSettings(
             url: _urlController.text.trim(),
+            workspaceSlug: _slugController.text.trim(),
             apiToken: _tokenController.text.trim(),
           ));
     }

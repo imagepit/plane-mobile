@@ -6,14 +6,24 @@ class LoadSettings extends SettingsEvent {}
 
 class SaveSettings extends SettingsEvent {
   final String url;
+  final String workspaceSlug;
   final String apiToken;
-  SaveSettings({required this.url, required this.apiToken});
+  SaveSettings({
+    required this.url,
+    required this.workspaceSlug,
+    required this.apiToken,
+  });
 }
 
 class TestConnection extends SettingsEvent {
   final String url;
+  final String workspaceSlug;
   final String apiToken;
-  TestConnection({required this.url, required this.apiToken});
+  TestConnection({
+    required this.url,
+    required this.workspaceSlug,
+    required this.apiToken,
+  });
 }
 
 class ResetSettings extends SettingsEvent {}
