@@ -31,10 +31,12 @@ class SettingsTestingConnection extends SettingsState {
 
 class SettingsConnectionSuccess extends SettingsState {
   final String url;
+  final String workspaceSlug;
   final String apiToken;
   final String userName;
   SettingsConnectionSuccess({
     required this.url,
+    required this.workspaceSlug,
     required this.apiToken,
     required this.userName,
   });

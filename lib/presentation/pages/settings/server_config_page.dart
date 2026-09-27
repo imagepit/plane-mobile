@@ -55,7 +55,7 @@ class ServerConfigView extends StatelessWidget {
                 initialSlug: state.lastSlug,
               ),
             SettingsConfigured() => const Center(child: CircularProgressIndicator()),
-            SettingsConnectionSuccess() => _buildConnectedView(context, state.userName),
+            SettingsConnectionSuccess() => _buildConnectedView(context, state),
             SettingsConnectionFailure(:final url, :final workspaceSlug, :final apiToken, :final error) => ServerConfigForm(
                 initialUrl: url,
                 initialSlug: workspaceSlug,
@@ -80,7 +80,7 @@ class ServerConfigView extends StatelessWidget {
     );
   }
 
-  Widget _buildConnectedView(BuildContext context, String userName) {
+  Widget _buildConnectedView(BuildContext context, SettingsConnectionSuccess state) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -88,12 +88,19 @@ class ServerConfigView extends StatelessWidget {
           const Icon(Icons.check_circle, size: 64, color: Colors.green),
           const SizedBox(height: 16),
           Text(
-            'Connected as $userName',
+            'Connected as ${state.userName}',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: () => context.go('/workspaces'),
+            // 保存してから一覧へ進む（保存しないと再起動時に設定画面へ戻る）
+            onPressed: () {
+              context.read<SettingsBloc>().add(SaveSettings(
+                    url: state.url,
+                    workspaceSlug: state.workspaceSlug,
+                    apiToken: state.apiToken,
+                  ));
+            },
             child: const Text('Continue'),
           ),
           const SizedBox(height: 8),

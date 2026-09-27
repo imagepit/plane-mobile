@@ -68,6 +68,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       final name = response.data?['first_name'] ?? response.data?['email'] ?? 'User';
       emit(SettingsConnectionSuccess(
         url: event.url,
+        workspaceSlug: event.workspaceSlug,
         apiToken: event.apiToken,
         userName: name.toString(),
       ));
