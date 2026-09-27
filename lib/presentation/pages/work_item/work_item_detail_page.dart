@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:plane_mobile/core/di/injection.dart';
 import 'package:plane_mobile/domain/entities/work_item.dart' as entities;
 import 'package:plane_mobile/domain/usecases/get_work_items.dart';
@@ -196,9 +197,9 @@ class _WorkItemDetailViewState extends State<WorkItemDetailView> {
           if (workItem.description != null && workItem.description!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                workItem.description!,
-                style: Theme.of(context).textTheme.bodyMedium,
+              child: HtmlWidget(
+                workItem.descriptionHtml ?? workItem.description!,
+                textStyle: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
           const Divider(height: 1),
