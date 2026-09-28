@@ -19,6 +19,7 @@ void main() {
       expect(lines[0].prefix, '├── ');
       expect(lines[1].prefix, '│   └── ');
       expect(lines[2].prefix, '└── ');
+      expect(lines.map((e) => e.depth), [0, 1, 0]);
     });
 
     test('マーカー ++ / ** / -- を分離する', () {

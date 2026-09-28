@@ -7,6 +7,7 @@ class FileTreeLine {
   final String name;
   final String? callout;
   final bool isRoot;
+  final int depth;
 
   const FileTreeLine({
     this.prefix = '',
@@ -14,7 +15,10 @@ class FileTreeLine {
     required this.name,
     this.callout,
     this.isRoot = false,
+    this.depth = 0,
   });
+
+  bool get isDirectory => name.endsWith('/');
 }
 
 /// tree-notation.md（design-system のパーサ仕様）の書式を Dart で再現する。
@@ -66,9 +70,35 @@ class FileTreeParser {
         marker: marker,
         name: name.trimRight(),
         callout: callout,
+        depth: _depth(raw),
       ));
     }
-    return lines;
+    final visible = lines.where((line) => !line.isRoot);
+    if (visible.isEmpty) return lines;
+    final minimum = visible.map((line) => line.depth).reduce((a, b) => a < b ? a : b);
+    if (minimum == 0) return lines;
+    return [
+      for (final line in lines)
+        line.isRoot
+            ? line
+            : FileTreeLine(
+                prefix: line.prefix,
+                marker: line.marker,
+                name: line.name,
+                callout: line.callout,
+                depth: line.depth - minimum,
+              ),
+    ];
+  }
+
+  /// design-system の parseUnicodeFileTree と同じ深さ。
+  /// `│   ` / `    ` の4文字グループ + 枝線1段。
+  static int _depth(String raw) {
+    final match = RegExp(r'^((?:(?:│| )[ \t]{3})*)(?:(├──|└──)[ \t]+)?').firstMatch(raw);
+    if (match == null) return 0;
+    final groups = match.group(1) ?? '';
+    final hasConnector = match.group(2) != null;
+    return (groups.length ~/ 4) + (hasConnector ? 1 : 0);
   }
 
   /// 枝線記号とその直後の空白まで（名前の手前まで）を返す。
@@ -101,10 +131,7 @@ class FileTreeView extends StatelessWidget {
   Widget build(BuildContext context) {
     final lines = FileTreeParser.parse(source);
     final scheme = Theme.of(context).colorScheme;
-    final mono = Theme.of(context).textTheme.bodySmall?.copyWith(
-      fontFamily: 'monospace',
-      height: 1.5,
-    );
+    final body = Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.35);
 
     Color markerColor(String marker) => switch (marker) {
           '++' => Colors.green.shade700,
@@ -125,33 +152,56 @@ class FileTreeView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (final line in lines)
-            if (line.isRoot)
-              const SizedBox(height: 2)
-            else
+            if (!line.isRoot)
               Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Column(
+                padding: EdgeInsets.only(left: line.depth * 16, bottom: 6),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(line.prefix, style: mono?.copyWith(color: scheme.outline)),
-                        if (line.marker.isNotEmpty)
-                          Text('${line.marker} ', style: mono?.copyWith(color: markerColor(line.marker), fontWeight: FontWeight.bold)),
-                        Expanded(
-                          child: Text(line.name, style: mono?.copyWith(color: scheme.onSurface)),
-                        ),
-                      ],
+                    Icon(
+                      line.isDirectory ? Icons.folder_outlined : Icons.description_outlined,
+                      size: 16,
+                      color: scheme.outline,
                     ),
-                    if (line.callout != null)
-                      Padding(
-                        padding: EdgeInsets.only(left: _indentWidth(line.prefix)),
-                        child: Text(
-                          line.callout!,
-                          style: mono?.copyWith(color: scheme.outline, fontStyle: FontStyle.italic),
-                        ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                if (line.marker.isNotEmpty)
+                                  TextSpan(
+                                    text: '${line.marker} ',
+                                    style: body?.copyWith(
+                                      color: markerColor(line.marker),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                TextSpan(
+                                  text: line.isDirectory
+                                      ? line.name.substring(0, line.name.length - 1)
+                                      : line.name,
+                                  style: body?.copyWith(
+                                    color: markerColor(line.marker),
+                                    decoration: line.marker == '--' ? TextDecoration.lineThrough : null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (line.callout != null)
+                            Text(
+                              line.callout!,
+                              style: body?.copyWith(
+                                color: scheme.outline,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                        ],
                       ),
+                    ),
                   ],
                 ),
               ),
@@ -159,7 +209,4 @@ class FileTreeView extends StatelessWidget {
       ),
     );
   }
-
-  /// callout の折り返しインデント（枝線の幅ぶん）。
-  double _indentWidth(String prefix) => prefix.length * 7.2;
 }
