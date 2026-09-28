@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:webview_flutter/webview_flutter.dart';
@@ -31,7 +29,12 @@ class _MermaidViewState extends State<MermaidView> {
   Future<void> _prepare() async {
     try {
       final js = await rootBundle.loadString('assets/mermaid/mermaid.min.js');
-      final source = jsonEncode(widget.source);
+      // ソースは HTML として埋め込む（mermaid は要素の textContent を読む）。
+      // JSON エンコードすると引用符と \n がそのまま混ざり構文エラーになる。
+      final escapedSource = widget.source
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;');
       final html = '''
 <!DOCTYPE html>
 <html>
@@ -41,7 +44,7 @@ class _MermaidViewState extends State<MermaidView> {
 <script>$js</script>
 </head>
 <body>
-<pre class="mermaid">$source</pre>
+<pre class="mermaid">$escapedSource</pre>
 <script>
   try {
     mermaid.initialize({ startOnLoad: true, securityLevel: 'strict' });

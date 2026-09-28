@@ -121,30 +121,45 @@ class FileTreeView extends StatelessWidget {
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final line in lines)
-              if (line.isRoot)
-                const SizedBox(height: 2)
-              else
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final line in lines)
+            if (line.isRoot)
+              const SizedBox(height: 2)
+            else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(line.prefix, style: mono?.copyWith(color: scheme.outline)),
-                    if (line.marker.isNotEmpty)
-                      Text('${line.marker} ', style: mono?.copyWith(color: markerColor(line.marker), fontWeight: FontWeight.bold)),
-                    Text(line.name, style: mono?.copyWith(color: scheme.onSurface)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(line.prefix, style: mono?.copyWith(color: scheme.outline)),
+                        if (line.marker.isNotEmpty)
+                          Text('${line.marker} ', style: mono?.copyWith(color: markerColor(line.marker), fontWeight: FontWeight.bold)),
+                        Expanded(
+                          child: Text(line.name, style: mono?.copyWith(color: scheme.onSurface)),
+                        ),
+                      ],
+                    ),
                     if (line.callout != null)
-                      Text('  <--[${line.callout!}]', style: mono?.copyWith(color: scheme.outline, fontStyle: FontStyle.italic)),
+                      Padding(
+                        padding: EdgeInsets.only(left: _indentWidth(line.prefix)),
+                        child: Text(
+                          line.callout!,
+                          style: mono?.copyWith(color: scheme.outline, fontStyle: FontStyle.italic),
+                        ),
+                      ),
                   ],
                 ),
-          ],
-        ),
+              ),
+        ],
       ),
     );
   }
+
+  /// callout の折り返しインデント（枝線の幅ぶん）。
+  double _indentWidth(String prefix) => prefix.length * 7.2;
 }
