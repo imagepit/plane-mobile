@@ -1,0 +1,56 @@
+name: Web checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.2'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze --no-pub --no-fatal-infos
+      - run: flutter test --no-pub
+      - name: ChromeのWeb試験
+        run: flutter test --no-pub --platform chrome
+      - name: JavaScript releaseビルド
+        run: flutter build web --release --base-href /mobile/ --no-web-resources-cdn --no-pub
+      - run: npm run test:package
+      - name: 配備用成果物の作成・SHA照合
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python3 scripts/package_web.py --sha "$SOURCE_SHA"
+          python3 scripts/package_web.py --verify --sha "$SOURCE_SHA"
+      - run: npm run check:deploy
+      - name: 検査したSHAの成果物を保存
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pwa-${{ github.sha }}
+          path: build/pwa
+          if-no-files-found: error
+          retention-days: 90

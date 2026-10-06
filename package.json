@@ -1,0 +1,16 @@
+{
+  "name": "plane-mobile-web-deployment",
+  "private": true,
+  "version": "1.0.0",
+  "engines": { "node": "22.22.2" },
+  "scripts": {
+    "package:web": "python3 scripts/package_web.py",
+    "test:package": "python3 -m unittest discover -s scripts -p test_package_web.py",
+    "dev:web": "wrangler dev --local --ip 127.0.0.1",
+    "check:deploy": "wrangler deploy --dry-run",
+    "deploy:web": "wrangler deploy",
+    "versions:web": "wrangler deployments list",
+    "rollback:web": "wrangler rollback"
+  },
+  "devDependencies": { "wrangler": "4.147.0" }
+}

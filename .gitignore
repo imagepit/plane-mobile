@@ -49,3 +49,10 @@ worktrees/
 
 # Local smoke-test config (contains the API token; never commit)
 smoke.local.json
+
+# Web配備用の依存パッケージ・ローカル状態
+node_modules/
+.wrangler/
+.dev.vars*
+.env*
+__pycache__/

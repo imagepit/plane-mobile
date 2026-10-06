@@ -213,6 +213,84 @@ APIトークンは、`flutter_secure_storage`を通じてiOS Keychain / Android 
 flutter test
 ```
 
+## CloudflareへのWeb配信
+
+配信先は`https://plane.itpit.net/mobile/`です。Workers Static Assetsの配信元を`build/pwa`とし、アプリをその中の`mobile/`へ配置します。RouteはHTTPSの`/mobile/*`だけです。末尾スラッシュのない`/mobile`はRouteの対象外なので、利用者には必ず`/mobile/`を案内してください。既存のデスクトップ画面、`/api/v1/`、Runnerの接続経路は変更しません。workers.devとpreview URLは無効です。
+
+### ローカルで配信を確認する
+
+Flutter **3.47.5**、Node **22.22.2**、Python 3を使います。Wrangler **4.147.0**をnpmのlockで固定しています。
+
+```bash
+npm ci --ignore-scripts --no-audit --no-fund
+flutter pub get --enforce-lockfile
+flutter analyze --no-pub --no-fatal-infos
+flutter test --no-pub
+flutter test --no-pub --platform chrome
+flutter build web --release --base-href /mobile/ --no-web-resources-cdn --no-pub
+npm run test:package
+npm run package:web
+npm run check:deploy
+npm run dev:web -- --port 8890
+```
+
+`http://127.0.0.1:8890/mobile/`で表示を確認します。本番で必要なHTTPS認証・保存の受入れは、ローカルHTTPの確認とは別に行ってください。`check:deploy`はdry-runで、本番へは配備しません。
+
+`web/_headers`のパスはリクエストURL基準です。配信元の直下へコピーし、`/mobile/*`だけにCSP、nosniff、Referrer-Policy、`private, max-age=0, must-revalidate`を付けます。CSPでは同梱のCanvasKitに必要なWebAssembly、FlutterのインラインCSS、描画用のblob workerを許可します。同じoriginのAPIへ接続し、別originへの通信許可やService Workerの登録は追加しません。ホスト全体のHSTSは既存設定を維持します。
+
+配備用スクリプトはbase・manifest・参照ファイル・ヘッダーを検査し、未使用の`flutter_service_worker.js`とFlutterの`.last_build_id`を除外します。独自bootstrapにはService Worker登録がありません。ローカル設定、symlink、想定外のパス、25 MiBを超えるファイル、20,000件を超える成果物は拒否します。`_release.json`にsource SHAと全配備ファイルのSHA-256を保存します。ビルド時のdefineへPATやスモーク設定を渡さないでください。ファイル名の検査だけで、任意のファイルに埋め込まれた秘密を検出できるわけではありません。
+
+### 配備前の準備と記録
+
+運用担当はGitHub Environment **`plane-mobile-production`**を作り、配備を承認するreviewerとmain限定のdeployment branchを設定してください。利用しているGitHubプランでEnvironmentの保護を設定できることも確認します。設定できない場合は配備を止め、承認方法を決めてから進めてください。
+
+このEnvironmentだけにsecret **`CLOUDFLARE_API_TOKEN`**とvariable **`CLOUDFLARE_ACCOUNT_ID`**を登録します。tokenの権限は対象アカウントのWorkers Scripts編集、`itpit.net`のWorkers Routes編集・Zone読取りに限定します。値は運用担当が登録し、コード・チャット・ログへ貼りません。PR用のWeb checksにはEnvironmentも配備secretも渡しません。
+
+本番配備前に、次の結果と日時を[CORE-53（PWA親項目）](https://plane.itpit.net/imagepit/browse/CORE-53/)のコメントへ残します。
+
+1. `plane.itpit.net`のDNSがproxiedで、既存Tunnelへの向き先を維持している。
+2. Accessの許可policyと対象host/pathを確認し、`/mobile/`と`/api/v1/`が本人限定の保護範囲に含まれる。より具体的なpathのBypass、別policy、サービス認証の例外も確認する。
+3. 現在の経路で未認証・本人以外による`/mobile/`と`/api/v1/`の取得が拒否される。実際の別本人の認証を試せない場合は未確認とし、成功扱いにしない。
+4. 既存Workers Routeとの競合がなく、最小権限と成果物の容量上限を満たす。
+5. mainへmergeされ、そのSHAのWeb checksが成功している。Environmentの承認と配備認証の登録が済んでいる。
+
+記録が揃うまで本番Routeの追加・配備を実行しません。Route追加前の拒否確認は、追加後の静的ファイル保護を証明するものではありません。配備直後にもHTML・JS・manifest・アイコンとAPIについて未認証・本人以外の取得拒否を確認します。取得できてしまう場合は新規Routeを外して既存経路へ戻し、配信成功にせず親コメントへ記録します。初回配備には過去のWorker versionがないため、この退避手順を使います。Accessを緩めて復旧しないでください。
+
+Access設定を追加・変更する前に、既存のpublic APIクライアントを確認してください。本人用のブラウザー認証とAPIクライアントの認証を混同せず、影響を確認できるまで変更を止めます。既存RunnerはTailscale内のprivate gatewayからNodePortへ接続する経路を維持します。通常のRoute管理はWranglerに任せます。緊急退避でRouteを外した後は配備を停止し、原因の修復と配備前確認・人の承認が揃った場合だけ再配備してください。
+
+### 検査済み成果物の手動配備・更新
+
+`Web checks`はPRとmainのpushで検査し、成功時だけ`pwa-<40桁SHA>`を保存します。artifactの保持期間は90日です。PRの成果物は配備に使いません。
+
+GitHub Actionsの**Deploy Web manually**をmainから実行し、次を入力します。
+
+- `sha`: 配備したい、Web checks成功済みのmainの40桁SHA
+- `preflight_record`: CORE-53に保存した配備前確認コメントのURL
+- `preflight_confirmed`: 上記の確認がすべて済んだ場合だけtrue
+
+確認欄とURLは運用担当による申告です。workflowはPlaneコメント本文を自動で検証しません。Environmentの承認者は記録を読んでから承認してください。
+
+workflowは指定SHAをcheckoutし、main履歴への所属と、そのSHAのmain push検査成功を確認します。そのrunのartifact ID・名前・SHA・archive digestを照合し、展開後も`_release.json`と全ファイルのhashを検査します。一つでも一致しない、成果物が期限切れ、欠落している場合は配備を止めます。対象SHAの配備設定とnpm lockを使用し、再ビルドはしません。配備secretを使うのは最後のWrangler配備ステップだけです。
+
+更新は新しい検査済みmain SHAで同じ操作を行います。開いたままの画面は現在のコードで動くため、作業内容を保存してからSafariで再読み込みしてください。配備前後のSHA、Web checks run、artifact IDとdigest、Cloudflare version ID、HTTPヘッダー、画面、既存デスクトップ/API/Runnerの結果をCORE-55へ記録します。
+
+配備直後に本番のCSP・nosniff・Referrer-Policy・cacheの実応答を照合し、未適用なら配信成功にせず退避・rollbackしてください。配備workflowは一つずつ実行し、実行中の配備は新しい依頼で取り消しません。
+
+### ロールバック
+
+通常は、保存期間内の以前の検査済みmain SHAを**Deploy Web manually**へ指定し、同じ成果物を再配備します。以前の`wrangler.jsonc`も使用するので、Route・配備設定の差分を先に確認してください。期限切れや削除済みのartifactは再ビルドして代用しません。
+
+緊急時は、配備記録でSHAと対応を確認したCloudflare version IDを使い、運用担当が以下を実行します。現在版と戻し先を必ず明示し、直前版へ暗黙に戻す運用は避けてください。
+
+```bash
+npm run versions:web
+npm run rollback:web -- <確認したversion-id> --message 'CORE-55 rollback'
+```
+
+Cloudflare側で保持されているversionだけが対象です。rollbackは現在のRouteや外部のAccess設定を復元しません。認証の問題なら新規Routeを外す退避が必要です。戻した後も再読み込み、SHA・画面・Access拒否・既存経路を確認し、更新とrollbackの結果をCORE-55へ残します。iPhoneのホーム画面起動と長期保存の受入れはCORE-56で行います。
+
+仕様の根拠: [サブディレクトリ配信](https://developers.cloudflare.com/workers/static-assets/routing/advanced/serving-a-subdirectory/)、[配信ヘッダー](https://developers.cloudflare.com/workers/static-assets/headers/)、[AccessとWorkers](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)、[rollback](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)、[Static Assetsの容量上限](https://developers.cloudflare.com/workers/platform/limits/#static-assets)。
+
 ## ライセンス
 
 MIT
