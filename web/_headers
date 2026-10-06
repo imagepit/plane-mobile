@@ -1,0 +1,6 @@
+# Planeのデスクトップ画面とAPIへは適用しない。
+/mobile/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Cache-Control: private, max-age=0, must-revalidate
+  Content-Security-Policy: default-src 'none'; base-uri 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'
