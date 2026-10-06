@@ -95,6 +95,12 @@ class PackageWebTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "必要な"):
             self.package()
 
+    def test_headers_before_path_rejected(self):
+        lines = self.headers.read_text().splitlines()
+        self.headers.write_text("\n".join(lines[1:] + lines[:1]))
+        with self.assertRaisesRegex(ValueError, "パス指定前"):
+            self.package()
+
     def test_root_header_rule_rejected(self):
         self.headers.write_text(self.headers.read_text().replace("/mobile/*", "/*"))
         with self.assertRaisesRegex(ValueError, "header"):

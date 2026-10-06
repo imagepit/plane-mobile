@@ -106,6 +106,8 @@ def validate_headers(path):
         if not line.startswith((" ", "\t")):
             rules.append(line.strip())
             continue
+        if not rules:
+            raise ValueError("パス指定前にheaderを記述できません")
         name, separator, value = line.strip().partition(":")
         name = name.lower()
         if not separator or name in headers:
