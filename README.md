@@ -236,7 +236,7 @@ npm run dev:web -- --port 8890
 
 `http://127.0.0.1:8890/mobile/`で表示を確認します。本番で必要なHTTPS認証・保存の受入れは、ローカルHTTPの確認とは別に行ってください。`check:deploy`はdry-runで、本番へは配備しません。
 
-`web/_headers`のパスはリクエストURL基準です。配信元の直下へコピーし、`/mobile/*`だけにCSP、nosniff、Referrer-Policy、`private, max-age=0, must-revalidate`を付けます。CSPでは同梱のCanvasKitに必要なWebAssembly、FlutterのインラインCSS、描画用のblob workerを許可します。API・外部CDNへの許可やService Workerの登録は追加しません。ホスト全体のHSTSは既存設定を維持します。
+`web/_headers`のパスはリクエストURL基準です。配信元の直下へコピーし、`/mobile/*`だけにCSP、nosniff、Referrer-Policy、`private, max-age=0, must-revalidate`を付けます。CSPでは同梱のCanvasKitに必要なWebAssembly、FlutterのインラインCSS、描画用のblob workerを許可します。同じoriginのAPIへ接続し、別originへの通信許可やService Workerの登録は追加しません。ホスト全体のHSTSは既存設定を維持します。
 
 配備用スクリプトはbase・manifest・参照ファイル・ヘッダーを検査し、未使用の`flutter_service_worker.js`とFlutterの`.last_build_id`を除外します。独自bootstrapにはService Worker登録がありません。ローカル設定、symlink、想定外のパス、25 MiBを超えるファイル、20,000件を超える成果物は拒否します。`_release.json`にsource SHAと全配備ファイルのSHA-256を保存します。ビルド時のdefineへPATやスモーク設定を渡さないでください。ファイル名の検査だけで、任意のファイルに埋め込まれた秘密を検出できるわけではありません。
 
@@ -256,6 +256,8 @@ npm run dev:web -- --port 8890
 
 記録が揃うまで本番Routeの追加・配備を実行しません。Route追加前の拒否確認は、追加後の静的ファイル保護を証明するものではありません。配備直後にもHTML・JS・manifest・アイコンとAPIについて未認証・本人以外の取得拒否を確認します。取得できてしまう場合は新規Routeを外して既存経路へ戻し、配信成功にせず親コメントへ記録します。初回配備には過去のWorker versionがないため、この退避手順を使います。Accessを緩めて復旧しないでください。
 
+Access設定を追加・変更する前に、既存のpublic APIクライアントを確認してください。本人用のブラウザー認証とAPIクライアントの認証を混同せず、影響を確認できるまで変更を止めます。既存RunnerはTailscale内のprivate gatewayからNodePortへ接続する経路を維持します。通常のRoute管理はWranglerに任せます。緊急退避でRouteを外した後は配備を停止し、原因の修復と配備前確認・人の承認が揃った場合だけ再配備してください。
+
 ### 検査済み成果物の手動配備・更新
 
 `Web checks`はPRとmainのpushで検査し、成功時だけ`pwa-<40桁SHA>`を保存します。artifactの保持期間は90日です。PRの成果物は配備に使いません。
@@ -271,6 +273,8 @@ GitHub Actionsの**Deploy Web manually**をmainから実行し、次を入力し
 workflowは指定SHAをcheckoutし、main履歴への所属と、そのSHAのmain push検査成功を確認します。そのrunのartifact ID・名前・SHA・archive digestを照合し、展開後も`_release.json`と全ファイルのhashを検査します。一つでも一致しない、成果物が期限切れ、欠落している場合は配備を止めます。対象SHAの配備設定とnpm lockを使用し、再ビルドはしません。配備secretを使うのは最後のWrangler配備ステップだけです。
 
 更新は新しい検査済みmain SHAで同じ操作を行います。開いたままの画面は現在のコードで動くため、作業内容を保存してからSafariで再読み込みしてください。配備前後のSHA、Web checks run、artifact IDとdigest、Cloudflare version ID、HTTPヘッダー、画面、既存デスクトップ/API/Runnerの結果をCORE-55へ記録します。
+
+配備直後に本番のCSP・nosniff・Referrer-Policy・cacheの実応答を照合し、未適用なら配信成功にせず退避・rollbackしてください。配備workflowは一つずつ実行し、実行中の配備は新しい依頼で取り消しません。
 
 ### ロールバック
 
