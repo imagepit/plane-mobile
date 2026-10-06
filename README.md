@@ -56,7 +56,7 @@ lib/
 
 ## Prerequisites
 
-- Flutter 3.x (Dart >= 3.0.0)
+- Flutter 3.x (Dart >= 3.3.0)
 - Android SDK (API 21+) / Xcode (iOS 12+)
 - A Plane self-hosted instance with API access
 
@@ -151,6 +151,85 @@ token — keep the token in the gitignored file only. The log prints the created
 work item id and HTTP statuses; it must not contain token values.
 
 ## Credential storage
+
+### iPhone web app
+
+The web build runs at `https://plane.itpit.net/mobile/`. Open it in Safari,
+sign in to the website if prompted, then use Share → Add to Home Screen.
+Launch **Plane Mobile** from the home screen. This requires neither Xcode
+nor membership of the Apple Developer Program.
+
+The web settings screen fixes the server to the current HTTPS origin.
+Enter your workspace slug and your personal Plane API token. API requests
+use `/api/v1/` on that origin, never `/mobile/api/v1/`. A saved server URL
+cannot override the web connection target. Native apps retain their
+configurable server URL.
+Web API requests use Fetch in same-origin mode and reject redirects before
+forwarding the token. A redirect to website sign-in therefore appears as an
+unreadable connection failure; reopen `/mobile/` in Safari to sign in.
+
+On Web, `flutter_secure_storage` 9.2.4 uses its experimental WebCrypto
+implementation to encrypt the token in browser storage. The credential
+namespace is `plane_mobile_pwa_credentials_v1`; non-secret preferences use
+the separate Hive box `plane_mobile_pwa_settings_v1`. Encryption does not
+give the protection of iOS Keychain: JavaScript running on the same origin
+can access the key and token. The website must use HTTPS, and browser data
+deletion or storage restrictions can require entering settings again.
+Saving settings checks the committed IndexedDB values before reporting
+success. An incomplete save disables API use and removes its newly saved
+token when deletion is available; a pending marker is detected after reload.
+Web credentials remain inactive until settings commit verification finishes.
+The encrypted activation marker is set to `pending` before writing a candidate
+token and changed to `ready` only after settings have committed. A failure to
+verify settings and delete the candidate cannot reactivate it on reload.
+Tokens are never put in Hive, URLs, build-time defines or application logs.
+
+Use **Clear saved settings** to remove the saved token and connection
+settings. If storage cannot be restored, the app opens settings instead of
+stopping startup. If saving or deletion fails, it reports failure; allow
+website storage and retry, or clear this website's data in Safari. Clearing
+website data also removes the desktop Plane session on the same origin.
+
+Website sign-in (Cloudflare Access) and the personal API token are separate.
+An HTML sign-in response prompts website sign-in; JSON 401 means the token
+is invalid/expired, and JSON 403 means API access is denied. An unreadable
+network failure can also mean sign-in is needed; the app does not assert
+its cause. Reopen `/mobile/` in Safari, sign in, then retry. Writes are never
+automatically retried: check whether the work item/comment was saved first.
+
+Web bodies show text, tables, code and FileTree. Mermaid shows its source
+without a WebView. Scripts, frames, event attributes, unsafe link schemes
+and automatically loaded external media are removed from Web body HTML.
+Native Mermaid rendering is unchanged. Home screen icons reuse the existing
+settings screen's Material `flight_takeoff` mark and primary blue; maskable
+icons keep the mark within the safe area.
+
+Build the JavaScript release with assets under `/mobile/`:
+
+```bash
+flutter build web --release --base-href /mobile/ --no-web-resources-cdn
+```
+
+This app has no Service Worker, offline editing, background sync or Push.
+Serving the release assets, update/rollback handling and iPhone acceptance
+are tracked by [CORE-55](https://plane.itpit.net/imagepit/browse/CORE-55/)
+(Cloudflare delivery) and [CORE-56](https://plane.itpit.net/imagepit/browse/CORE-56/)
+(device acceptance). Local browser checks cannot establish iPhone home
+screen/safe-area behavior or the eight-day acceptance result.
+
+Web verification:
+
+```bash
+flutter analyze --no-fatal-infos
+flutter test
+flutter test --platform chrome
+```
+
+Tests use dummy credentials and mocked native secure stores. Browser storage
+is also checked in a release harness using the production storage classes;
+no check reads a device Keychain or a production token.
+
+### Native apps
 
 The API token is stored only in the platform secure store (`flutter_secure_storage`:
 iOS Keychain / Android Keystore) and is never written to Hive or other plain

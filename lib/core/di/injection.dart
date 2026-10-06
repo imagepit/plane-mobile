@@ -47,12 +47,10 @@ Future<void> configureDependencies() async {
   await localStorage.init();
   sl.registerSingleton<LocalStorage>(localStorage);
 
-  if (localStorage.isConfigured) {
-    sl<DioClient>().updateConfig(
-      baseUrl: localStorage.selfHostedUrl!,
-      apiToken: localStorage.apiToken!,
-    );
-  }
+  sl<DioClient>().updateConfig(
+    baseUrl: localStorage.selfHostedUrl,
+    apiToken: localStorage.isConfigured ? localStorage.apiToken : '',
+  );
 
   sl.registerFactory<WorkItemRemoteDataSource>(
     () => WorkItemRemoteDataSource(sl<DioClient>()),
@@ -92,13 +90,18 @@ Future<void> configureDependencies() async {
     () => ProjectRepositoryImpl(sl<ProjectRemoteDataSource>()),
   );
 
-  sl.registerFactory<GetWorkspaces>(() => GetWorkspaces(sl<WorkspaceRepository>()));
+  sl.registerFactory<GetWorkspaces>(
+      () => GetWorkspaces(sl<WorkspaceRepository>()));
   sl.registerFactory<GetProjects>(() => GetProjects(sl<ProjectRepository>()));
-  sl.registerFactory<GetWorkItems>(() => GetWorkItems(sl<WorkItemRepository>()));
+  sl.registerFactory<GetWorkItems>(
+      () => GetWorkItems(sl<WorkItemRepository>()));
   sl.registerFactory<GetWorkItem>(() => GetWorkItem(sl<WorkItemRepository>()));
-  sl.registerFactory<CreateWorkItem>(() => CreateWorkItem(sl<WorkItemRepository>()));
-  sl.registerFactory<UpdateWorkItem>(() => UpdateWorkItem(sl<WorkItemRepository>()));
-  sl.registerFactory<DeleteWorkItem>(() => DeleteWorkItem(sl<WorkItemRepository>()));
+  sl.registerFactory<CreateWorkItem>(
+      () => CreateWorkItem(sl<WorkItemRepository>()));
+  sl.registerFactory<UpdateWorkItem>(
+      () => UpdateWorkItem(sl<WorkItemRepository>()));
+  sl.registerFactory<DeleteWorkItem>(
+      () => DeleteWorkItem(sl<WorkItemRepository>()));
   sl.registerFactory<GetStates>(() => GetStates(sl<WorkItemRepository>()));
   sl.registerFactory<GetLabels>(() => GetLabels(sl<WorkItemRepository>()));
   sl.registerFactory<GetMembers>(() => GetMembers(sl<WorkItemRepository>()));
@@ -106,7 +109,8 @@ Future<void> configureDependencies() async {
   sl.registerFactory<AddComment>(() => AddComment(sl<WorkItemRepository>()));
 
   sl.registerFactory<SettingsBloc>(
-    () => SettingsBloc(localStorage: sl<LocalStorage>(), dioClient: sl<DioClient>()),
+    () => SettingsBloc(
+        localStorage: sl<LocalStorage>(), dioClient: sl<DioClient>()),
   );
   sl.registerFactory<WorkspaceBloc>(
     () => WorkspaceBloc(getWorkspaces: sl<GetWorkspaces>()),

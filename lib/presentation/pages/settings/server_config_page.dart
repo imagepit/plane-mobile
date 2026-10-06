@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -15,7 +16,7 @@ class ServerConfigPage extends StatelessWidget {
       create: (_) => SettingsBloc(
         localStorage: sl<LocalStorage>(),
         dioClient: sl(),
-      )..add(LoadSettings()),
+      )..add(LoadSettings(edit: kIsWeb)),
       child: const ServerConfigView(),
     );
   }
@@ -49,20 +50,29 @@ class ServerConfigView extends StatelessWidget {
         },
         builder: (context, state) {
           return switch (state) {
-            SettingsLoading() => const Center(child: CircularProgressIndicator()),
+            SettingsLoading() =>
+              const Center(child: CircularProgressIndicator()),
             SettingsUnconfigured() => ServerConfigForm(
                 initialUrl: state.lastUrl,
                 initialSlug: state.lastSlug,
               ),
-            SettingsConfigured() => const Center(child: CircularProgressIndicator()),
+            SettingsConfigured() =>
+              const Center(child: CircularProgressIndicator()),
             SettingsConnectionSuccess() => _buildConnectedView(context, state),
-            SettingsConnectionFailure(:final url, :final workspaceSlug, :final apiToken, :final error) => ServerConfigForm(
+            SettingsConnectionFailure(
+              :final url,
+              :final workspaceSlug,
+              :final apiToken,
+              :final error
+            ) =>
+              ServerConfigForm(
                 initialUrl: url,
                 initialSlug: workspaceSlug,
                 initialToken: apiToken,
                 initialError: error,
               ),
-            SettingsTestingConnection() => const Center(child: Column(
+            SettingsTestingConnection() => const Center(
+                  child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CircularProgressIndicator(),
@@ -80,7 +90,8 @@ class ServerConfigView extends StatelessWidget {
     );
   }
 
-  Widget _buildConnectedView(BuildContext context, SettingsConnectionSuccess state) {
+  Widget _buildConnectedView(
+      BuildContext context, SettingsConnectionSuccess state) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,

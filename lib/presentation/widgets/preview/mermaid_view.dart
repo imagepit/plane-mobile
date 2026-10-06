@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:webview_flutter/webview_flutter.dart';
@@ -23,7 +24,7 @@ class _MermaidViewState extends State<MermaidView> {
   @override
   void initState() {
     super.initState();
-    _prepare();
+    if (!kIsWeb) _prepare();
   }
 
   Future<void> _prepare() async {
@@ -98,7 +99,10 @@ class _MermaidViewState extends State<MermaidView> {
         ),
         child: Text(
           widget.source,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(fontFamily: 'monospace'),
         ),
       );
     }
