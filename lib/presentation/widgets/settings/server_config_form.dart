@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:plane_mobile/presentation/blocs/settings/settings_bloc.dart';
+import 'package:plane_mobile/core/constants/app_constants.dart';
 
 class ServerConfigForm extends StatefulWidget {
   final String? initialUrl;
@@ -30,7 +32,9 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialUrl != null) {
+    if (kIsWeb) {
+      _urlController.text = Uri.base.origin;
+    } else if (widget.initialUrl != null) {
       _urlController.text = widget.initialUrl!;
     }
     if (widget.initialSlug != null) {
@@ -82,6 +86,7 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
             ),
             const SizedBox(height: 40),
             TextFormField(
+              readOnly: kIsWeb,
               controller: _urlController,
               decoration: const InputDecoration(
                 labelText: 'Server URL',
@@ -93,7 +98,8 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your server URL';
                 }
-                if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                if (!value.startsWith('http://') &&
+                    !value.startsWith('https://')) {
                   return 'URL must start with http:// or https://';
                 }
                 return null;
@@ -101,6 +107,12 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
               autovalidateMode: AutovalidateMode.onUserInteraction,
             ),
             const SizedBox(height: 16),
+            if (kIsWeb) ...[
+              const Text('This app connects to this website only. If website '
+                  'sign-in expires, reopen ${AppConstants.webPath} in Safari '
+                  'and sign in again. Your personal Plane API token is also required.'),
+              const SizedBox(height: 16),
+            ],
             TextFormField(
               controller: _slugController,
               decoration: const InputDecoration(
@@ -120,6 +132,8 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _tokenController,
+              autocorrect: false,
+              enableSuggestions: false,
               obscureText: _obscureToken,
               decoration: InputDecoration(
                 labelText: 'API Token',
@@ -127,8 +141,10 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
                 prefixIcon: const Icon(Icons.key),
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureToken ? Icons.visibility : Icons.visibility_off),
-                  onPressed: () => setState(() => _obscureToken = !_obscureToken),
+                  icon: Icon(
+                      _obscureToken ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () =>
+                      setState(() => _obscureToken = !_obscureToken),
                 ),
               ),
               validator: (value) {
@@ -159,6 +175,12 @@ class _ServerConfigFormState extends State<ServerConfigForm> {
               icon: const Icon(Icons.login),
               label: const Text('Save & Connect'),
             ),
+            if (kIsWeb)
+              TextButton(
+                onPressed: () =>
+                    context.read<SettingsBloc>().add(ResetSettings()),
+                child: const Text('Clear saved settings'),
+              ),
           ],
         ),
       ),

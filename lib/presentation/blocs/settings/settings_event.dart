@@ -2,7 +2,10 @@ part of 'settings_bloc.dart';
 
 abstract class SettingsEvent {}
 
-class LoadSettings extends SettingsEvent {}
+class LoadSettings extends SettingsEvent {
+  final bool edit;
+  LoadSettings({this.edit = false});
+}
 
 class SaveSettings extends SettingsEvent {
   final String url;
