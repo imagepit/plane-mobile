@@ -90,22 +90,36 @@ def validate_app(root):
         if icon.get("src") not in files:
             raise ValueError("manifestのiconがありません")
     bootstrap = (root / "flutter_bootstrap.js").read_text()
-    if not bootstrap.rstrip().endswith("_flutter.loader.load();"):
+    loader_calls = re.findall(r"_flutter\s*\.\s*loader\s*\.\s*load\s*\(", bootstrap)
+    if len(loader_calls) != 1 or not bootstrap.rstrip().endswith("_flutter.loader.load();"):
         raise ValueError("Service Worker設定なしのbootstrapではありません")
     return files
 
 
 def validate_headers(path):
     text = path.read_text()
-    rules = [line.strip() for line in text.splitlines()
-             if line and not line.startswith((" ", "#"))]
+    rules = []
+    headers = {}
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line.startswith((" ", "\t")):
+            rules.append(line.strip())
+            continue
+        name, separator, value = line.strip().partition(":")
+        name = name.lower()
+        if not separator or name in headers:
+            raise ValueError("headerの形式または重複が不正です")
+        headers[name] = value.strip()
     if rules != ["/mobile/*"]:
         raise ValueError("headerは/mobile/*だけへ適用してください")
-    for required in ["X-Content-Type-Options: nosniff", "Referrer-Policy: no-referrer",
-                     "Cache-Control: private, max-age=0, must-revalidate", "Content-Security-Policy:"]:
-        if required not in text:
+    for name, value in {"x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
+                        "cache-control": "private, max-age=0, must-revalidate"}.items():
+        if headers.get(name) != value:
             raise ValueError("必要な配信headerがありません")
-    if "Strict-Transport-Security:" in text or "Access-Control-Allow-Origin:" in text:
+    if not headers.get("content-security-policy"):
+        raise ValueError("必要な配信headerがありません")
+    if "strict-transport-security" in headers or "access-control-allow-origin" in headers:
         raise ValueError("ホスト全体のHSTS/CORS設定は変更できません")
 
 
@@ -140,6 +154,8 @@ def package_web(source, destination, sha, headers):
     if destination.name != "pwa" or destination.parent.name != "build" or destination.is_symlink():
         raise ValueError("出力先はbuild/pwaを指定してください")
     destination = destination.resolve()
+    if destination.name != "pwa" or destination.parent.name != "build":
+        raise ValueError("実際の出力先もbuild/pwaである必要があります")
     if source == destination or source in destination.parents or destination in source.parents:
         raise ValueError("入力と出力が重なっています")
     if destination.exists():

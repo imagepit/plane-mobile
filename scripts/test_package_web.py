@@ -84,6 +84,17 @@ class PackageWebTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "bootstrap"):
             self.package()
 
+    def test_multiple_loader_calls_rejected(self):
+        (self.source / "flutter_bootstrap.js").write_text('_flutter.loader.load({serviceWorkerSettings: {}});\n_flutter.loader.load();')
+        with self.assertRaisesRegex(ValueError, "bootstrap"):
+            self.package()
+
+    def test_comment_cannot_supply_required_headers(self):
+        text = self.headers.read_text()
+        self.headers.write_text("\n".join("# " + line if line.startswith(" ") else line for line in text.splitlines()))
+        with self.assertRaisesRegex(ValueError, "必要な"):
+            self.package()
+
     def test_root_header_rule_rejected(self):
         self.headers.write_text(self.headers.read_text().replace("/mobile/*", "/*"))
         with self.assertRaisesRegex(ValueError, "header"):
@@ -115,6 +126,18 @@ class PackageWebTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "重なっています"):
             package_web(self.output, alias / "build/pwa", self.sha, self.headers)
         self.assertTrue((self.output / "main.dart.js").is_file())
+
+    def test_parent_symlink_cannot_delete_arbitrary_directory(self):
+        data = self.root / "data"
+        victim = data / "pwa"
+        victim.mkdir(parents=True)
+        (victim / "keep.txt").write_text("keep")
+        alias = self.root / "alias"
+        alias.mkdir()
+        (alias / "build").symlink_to(data, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "実際の出力先"):
+            package_web(self.source, alias / "build/pwa", self.sha, self.headers)
+        self.assertTrue((victim / "keep.txt").is_file())
 
     def test_wrong_artifact_sha_rejected(self):
         self.package()
