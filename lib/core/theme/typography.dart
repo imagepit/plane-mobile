@@ -1,7 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class AppTypography {
   AppTypography._();
+
+  // CanvasKitは端末の日本語フォントを使えないため、Webでは同梱フォントを使う。
+  static const webFontFamily = 'NotoSansJP';
+  static String? get fontFamily => kIsWeb ? webFontFamily : null;
+  static List<String>? get fontFamilyFallback =>
+      kIsWeb ? const [webFontFamily] : null;
 
   static TextTheme get light => const TextTheme(
         displayLarge: TextStyle(
@@ -94,7 +101,7 @@ class AppTypography {
           letterSpacing: 0.5,
           height: 1.45,
         ),
-      );
+      ).apply(fontFamily: fontFamily, fontFamilyFallback: fontFamilyFallback);
 
   static TextTheme get dark => light;
 }

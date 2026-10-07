@@ -7,6 +7,8 @@ class AppTheme {
 
   static ThemeData get lightTheme => ThemeData(
         useMaterial3: true,
+        fontFamily: AppTypography.fontFamily,
+        fontFamilyFallback: AppTypography.fontFamilyFallback,
         colorScheme: app_colors.AppColorScheme.lightColorScheme,
         textTheme: AppTypography.light,
         brightness: Brightness.light,
@@ -80,6 +82,8 @@ class AppTheme {
 
   static ThemeData get darkTheme => ThemeData(
         useMaterial3: true,
+        fontFamily: AppTypography.fontFamily,
+        fontFamilyFallback: AppTypography.fontFamilyFallback,
         colorScheme: app_colors.AppColorScheme.darkColorScheme,
         textTheme: AppTypography.dark,
         brightness: Brightness.dark,

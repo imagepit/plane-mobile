@@ -1,9 +1,37 @@
 import json
+import struct
 import tempfile
 import unittest
 from pathlib import Path
 
 from package_web import package_web, verify_package
+
+
+class JapaneseFontTest(unittest.TestCase):
+    def test_font_has_japanese_and_file_tree_glyphs(self):
+        font = (Path(__file__).resolve().parents[1] / "assets/fonts/NotoSansJP.ttf").read_bytes()
+        # OpenType cmap format 12: Unicode ranges map to glyph IDs (0 is .notdef).
+        tables = {struct.unpack_from(">4s", font, 12 + i * 16)[0]:
+                  struct.unpack_from(">I", font, 20 + i * 16)[0]
+                  for i in range(struct.unpack_from(">H", font, 4)[0])}
+        cmap = tables[b"cmap"]
+        maps = []
+        for i in range(struct.unpack_from(">H", font, cmap + 2)[0]):
+            platform, _, relative = struct.unpack_from(">HHI", font, cmap + 4 + i * 8)
+            offset = cmap + relative
+            if platform == 0 and struct.unpack_from(">H", font, offset)[0] == 12:
+                maps.append(offset)
+        self.assertTrue(maps, "Unicode cmap format 12 is missing")
+        offset = maps[0]
+        groups = [struct.unpack_from(">III", font, offset + 16 + i * 12)
+                  for i in range(struct.unpack_from(">I", font, offset + 12)[0])]
+        sample = ("共通基盤教育メディア投資里山暮らし日本語の説明"
+                  "プロジェクト課題作成状態更新開始終了関連コメント"
+                  "漢字ひらがなカタカナ髙﨑①。、「」（）├─└++**--")
+        for char in set(sample):
+            with self.subTest(char=char):
+                self.assertTrue(any(first <= ord(char) <= last and glyph + ord(char) - first > 0
+                                    for first, last, glyph in groups), "Missing glyph")
 
 
 class PackageWebTest(unittest.TestCase):
