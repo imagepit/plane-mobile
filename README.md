@@ -138,11 +138,15 @@ flutter test integration_test/smoke_test.dart \
 
 ### iPhone向けWebアプリ
 
-Web版の配信先は`https://plane.itpit.net/mobile/`を予定しています。配信後はSafariで開き、Webサイトへのサインインを求められたら認証します。その後、共有メニューの「ホーム画面に追加」を選びます。ホーム画面の「Plane Mobile」から起動でき、XcodeやApple Developer Programへの加入は不要です。
+Web版の配信先は`https://plane.itpit.net/mobile/`です。Safariで開き、Webサイトへのサインインを求められたら認証します。その後、共有メニューの「ホーム画面に追加」を選びます。ホーム画面の「Plane Mobile」から起動でき、XcodeやApple Developer Programへの加入は不要です。
 
 Web版の設定画面では、接続先が現在のHTTPS origin（スキーム・ホスト・ポート）に固定されます。ワークスペースのslugと個人APIトークンを入力してください。APIには同じoriginの`/api/v1/`から接続し、`/mobile/api/v1/`は使いません。保存済みのURLで接続先を変更することもできません。ネイティブ版では接続先URLを指定できます。
 
 Web版のAPI通信にはFetchのsame-originモードを使い、トークンを転送する前にリダイレクトを拒否します。そのため、サインイン画面へのリダイレクトは、応答を読めない通信失敗として表示されます。Safariで`/mobile/`を開き直してサインインしてください。
+
+Web版の日本語表示には、アプリに同梱したNoto Sans JPを使います。ライト・ダークの両テーマで、プロジェクト名、本文、入力欄、コード内の日本語にも適用します。フォントは`/mobile/`配下から配信し、外部のフォント配信サービスへ接続する必要はありません。初回の取得量は約9.6 MB増えます。ネイティブ版のフォント設定は従来どおりです。
+
+フォントの取得元は[Google FontsのNoto Sans JP](https://github.com/google/fonts/tree/295d98a7a0c17c68f1341eaeea354e7960ea70d3/ofl/notosansjp)です。可変フォントを変更せず同梱し、SIL Open Font License 1.1を`assets/fonts/OFL.txt`へ保存しています。
 
 Web版では、`flutter_secure_storage` 9.2.4の実験的なWebCrypto実装でトークンを暗号化し、ブラウザーに保存します。認証情報の名前空間は`plane_mobile_pwa_credentials_v1`です。非機密設定は別のHive boxである`plane_mobile_pwa_settings_v1`へ保存します。同じoriginで動くJavaScriptは鍵とトークンへアクセスできるため、iOS Keychainと同等の保護にはなりません。HTTPSが必要です。ブラウザーのデータ削除や保存制限によって、設定の再入力が必要になる場合があります。
 

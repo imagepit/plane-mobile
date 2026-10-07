@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as parser;
+import 'package:plane_mobile/core/theme/typography.dart';
 import 'package:plane_mobile/presentation/widgets/preview/file_tree_view.dart';
 import 'package:plane_mobile/presentation/widgets/preview/mermaid_view.dart';
 
@@ -95,6 +96,11 @@ class RichHtml extends StatelessWidget {
     return HtmlWidget(
       kIsWeb ? sanitizeWebHtml(html) : html,
       textStyle: textStyle,
+      customStylesBuilder: (element) => kIsWeb &&
+              const {'pre', 'code', 'kbd', 'samp', 'tt'}
+                  .contains(element.localName)
+          ? {'font-family': 'monospace, ${AppTypography.webFontFamily}'}
+          : null,
       customWidgetBuilder: codeBlockPreviewBuilder,
     );
   }

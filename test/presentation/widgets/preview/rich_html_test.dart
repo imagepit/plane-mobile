@@ -2,10 +2,42 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:html/parser.dart';
+import 'package:plane_mobile/core/theme/app_theme.dart';
+import 'package:plane_mobile/core/theme/typography.dart';
 import 'package:plane_mobile/presentation/widgets/preview/code_block_preview.dart';
 import 'package:plane_mobile/presentation/widgets/preview/file_tree_view.dart';
 
 void main() {
+  testWidgets('Web code retains monospace and can fall back to Japanese glyphs',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: const Scaffold(
+          body: RichHtml(
+              html:
+                  '<p><code>日本語のコメント</code></p><pre><code>状態を更新する();</code></pre>')),
+    ));
+    await tester.pumpAndSettle();
+    final styles = <TextStyle>[];
+    void visit(InlineSpan span, TextStyle inherited) {
+      if (span is! TextSpan) return;
+      final style = inherited.merge(span.style);
+      if (span.text?.contains(RegExp(r'[日本語状態]')) ?? false) styles.add(style);
+      for (final child in span.children ?? <InlineSpan>[]) {
+        visit(child, style);
+      }
+    }
+
+    for (final widget in tester.widgetList<RichText>(find.byType(RichText))) {
+      visit(widget.text, const TextStyle());
+    }
+    expect(styles, hasLength(2));
+    for (final style in styles) {
+      expect(style.fontFamily, 'monospace');
+      expect(style.fontFamilyFallback, contains(AppTypography.webFontFamily));
+    }
+  }, skip: !kIsWeb);
+
   test(
       'sanitizer removes executable markup, event handlers, CSS URLs and automatic embeds',
       () {
