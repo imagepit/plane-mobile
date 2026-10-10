@@ -26,6 +26,8 @@ Tiptap 3.31.4 / ProseMirrorのMITライセンスの編集エンジンを、React
 
 Node試験は、書式・ブロック編集、未変更HTML、タイトルのみの保存、本文の消去、失敗後の再試行、Saveの二重操作、日本語の変換中、変更破棄、Mermaid・ツリー、既存の画像・数式・メンション・表・チェックリストと貼付HTMLを確認する。Flutter試験はタイトルと本文からの導線、変更項目だけのPATCH、未変更Save、失敗時の入力保持、保存後のチェック状態を確認する。
 
+確認画像: [編集画面](ui-evidence/work-item-editor-light.png)、[ブロック追加](ui-evidence/work-item-block-menu.png)、[ダークテーマとコード](ui-evidence/work-item-editor-dark-rich.png)。
+
 実際のreleaseビルドと本番と同じCSPを付けたローカル確認画面で、390px幅のタイトル・本文編集、書式と見出しの追加、Save後の表示を確認した。確認データは通信・認証情報を持たないダミーである。iPhone実機のホーム画面PWAと日本語キーボードの変換・候補選択・キーボード開閉は、マージ後の実機確認事項である。
 
 根拠: [StarterKit](https://tiptap.dev/docs/editor/extensions/functionality/starterkit)、[拡張と属性](https://tiptap.dev/docs/editor/extensions/custom-extensions/extend-existing)、[Table](https://tiptap.dev/docs/editor/extensions/nodes/table)、[TaskList](https://tiptap.dev/docs/editor/extensions/nodes/task-list)。
