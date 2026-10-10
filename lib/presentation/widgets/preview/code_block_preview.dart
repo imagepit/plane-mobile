@@ -15,15 +15,26 @@ Widget? codeBlockPreviewBuilder(dom.Element element) {
 
   final code = localName == 'code' ? element : element.querySelector('code');
   final target = code ?? element;
-  final classes = target.className.split(RegExp(r'\s+'));
-  final text = target.text;
-  if (text.trim().isEmpty) return null;
+  final languages = <String>{
+    for (final node in {element, target}) ...[
+      ...node.className
+          .split(RegExp(r'\s+'))
+          .where((value) => value.startsWith('language-'))
+          .map((value) => value.substring('language-'.length)),
+      if (node.attributes['data-language'] case final String value)
+        value.trim().split(RegExp(r'\s+')).first,
+    ],
+  };
+  final text = target.innerHtml
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
+  final source = parser.parseFragment(text).text ?? '';
+  if (source.trim().isEmpty) return null;
 
-  if (classes.contains('language-file-tree')) {
-    return FileTreeView(source: text);
+  if (languages.contains('file-tree') || languages.contains('tree')) {
+    return FileTreeView(source: source);
   }
-  if (classes.contains('language-mermaid')) {
-    return MermaidView(source: text);
+  if (languages.contains('mermaid')) {
+    return MermaidView(source: source);
   }
   return null;
 }
@@ -65,6 +76,7 @@ String sanitizeWebHtml(String html) {
   };
   const attributes = {
     'class',
+    'data-language',
     'title',
     'colspan',
     'rowspan',

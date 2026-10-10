@@ -6,8 +6,39 @@ import 'package:plane_mobile/core/theme/app_theme.dart';
 import 'package:plane_mobile/core/theme/typography.dart';
 import 'package:plane_mobile/presentation/widgets/preview/code_block_preview.dart';
 import 'package:plane_mobile/presentation/widgets/preview/file_tree_view.dart';
+import 'package:plane_mobile/presentation/widgets/preview/mermaid_view.dart';
 
 void main() {
+  test(
+      'tree and mermaid languages on pre or code and data-language are recognised',
+      () {
+    for (final markup in [
+      '<pre><code class="language-tree">.\n└── ++ hello.dart &lt;--[new file]</code></pre>',
+      '<pre class="language-tree"><code>.\n└── ++ hello.dart</code></pre>',
+      '<pre data-language="tree"><code>.&lt;br&gt;└── hello.dart</code></pre>',
+      '<pre><code data-language="file-tree">.\n└── hello.dart</code></pre>',
+    ]) {
+      final element =
+          parseFragment(sanitizeWebHtml(markup)).querySelector('pre')!;
+      expect(codeBlockPreviewBuilder(element), isA<FileTreeView>());
+    }
+    final mermaid = parseFragment(
+            '<pre data-language="mermaid"><code>graph TD; A--&gt;B;</code></pre>')
+        .querySelector('pre')!;
+    expect(codeBlockPreviewBuilder(mermaid), isA<MermaidView>());
+    final plain = parseFragment('<pre><code>plain_code()</code></pre>')
+        .querySelector('pre')!;
+    expect(codeBlockPreviewBuilder(plain), isNull);
+  });
+
+  test('code block line breaks and entities survive preview extraction', () {
+    final element = parseFragment(
+            '<pre><code class="language-tree">.<br>└── ++ a&amp;b.dart &lt;--[説明]</code></pre>')
+        .querySelector('pre')!;
+    final tree = codeBlockPreviewBuilder(element) as FileTreeView;
+    expect(tree.source, '.\n└── ++ a&b.dart <--[説明]');
+  });
+
   testWidgets('Web code retains monospace and can fall back to Japanese glyphs',
       (tester) async {
     await tester.pumpWidget(MaterialApp(
