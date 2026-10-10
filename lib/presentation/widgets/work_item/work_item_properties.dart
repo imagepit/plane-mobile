@@ -219,55 +219,62 @@ class WorkItemProperties extends StatelessWidget {
     final result = await showModalBottomSheet<List<String>>(
         context: ctx,
         isScrollControlled: true,
+        useRootNavigator: true,
         showDragHandle: true,
         builder: (c) => StatefulBuilder(
             builder: (c, update) => SafeArea(
-                child: SizedBox(
-                    height: MediaQuery.sizeOf(c).height * .72,
-                    child: Column(children: [
-                      Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                          child: Text(title,
-                              style: Theme.of(c).textTheme.titleLarge)),
-                      Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: TextField(
-                              decoration: InputDecoration(
-                                  hintText: 'Search $title',
-                                  prefixIcon: const Icon(Icons.search)),
-                              onChanged: (s) =>
-                                  update(() => query = s.toLowerCase()))),
-                      Expanded(
-                          child: ListView(children: [
-                        for (final (id, name) in choices
-                            .where((x) => x.$2.toLowerCase().contains(query)))
-                          CheckboxListTile(
-                              title: Text(name),
-                              value: selected.contains(id),
-                              onChanged: (v) => update(() {
-                                    if (!multiple) selected.clear();
-                                    if (v == true)
-                                      selected.add(id);
-                                    else if (multiple) selected.remove(id);
-                                  }))
-                      ])),
-                      Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(children: [
-                            Expanded(
-                                child: OutlinedButton(
-                                    onPressed: () => Navigator.pop(c),
-                                    child: const Text('Cancel'))),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: FilledButton(
-                                    onPressed: !multiple && selected.isEmpty
-                                        ? null
-                                        : () =>
-                                            Navigator.pop(c, selected.toList()),
-                                    child: const Text('Save')))
+                child: Padding(
+                    padding: EdgeInsets.only(
+                        bottom: MediaQuery.viewInsetsOf(c).bottom),
+                    child: SizedBox(
+                        height: (MediaQuery.sizeOf(c).height -
+                                MediaQuery.viewInsetsOf(c).bottom) *
+                            .72,
+                        child: Column(children: [
+                          Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              child: Text(title,
+                                  style: Theme.of(c).textTheme.titleLarge)),
+                          Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: TextField(
+                                  decoration: InputDecoration(
+                                      hintText: 'Search $title',
+                                      prefixIcon: const Icon(Icons.search)),
+                                  onChanged: (s) =>
+                                      update(() => query = s.toLowerCase()))),
+                          Expanded(
+                              child: ListView(children: [
+                            for (final (id, name) in choices.where(
+                                (x) => x.$2.toLowerCase().contains(query)))
+                              CheckboxListTile(
+                                  title: Text(name),
+                                  value: selected.contains(id),
+                                  onChanged: (v) => update(() {
+                                        if (!multiple) selected.clear();
+                                        if (v == true)
+                                          selected.add(id);
+                                        else if (multiple) selected.remove(id);
+                                      }))
                           ])),
-                    ])))));
+                          Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(children: [
+                                Expanded(
+                                    child: OutlinedButton(
+                                        onPressed: () => Navigator.pop(c),
+                                        child: const Text('Cancel'))),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                    child: FilledButton(
+                                        onPressed: !multiple && selected.isEmpty
+                                            ? null
+                                            : () => Navigator.pop(
+                                                c, selected.toList()),
+                                        child: const Text('Save')))
+                              ])),
+                        ]))))));
     if (result != null) changed(result);
   }
 
@@ -275,6 +282,7 @@ class WorkItemProperties extends StatelessWidget {
       ValueChanged<String?> changed) async {
     final action = await showModalBottomSheet<String>(
         context: ctx,
+        useRootNavigator: true,
         showDragHandle: true,
         builder: (c) => SafeArea(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [

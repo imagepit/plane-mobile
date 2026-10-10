@@ -41,6 +41,7 @@ class WorkItemFilterBar extends StatelessWidget {
     final result = await showModalBottomSheet<(String?, String?)>(
         context: context,
         isScrollControlled: true,
+        useRootNavigator: true,
         showDragHandle: true,
         builder: (ctx) => StatefulBuilder(
             builder: (ctx, update) => SafeArea(

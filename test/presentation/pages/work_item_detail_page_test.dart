@@ -158,4 +158,22 @@ void main() {
     await t.pumpAndSettle();
     expect(repo.writes, writes);
   });
+  testWidgets('candidate search sheet keeps Save above the keyboard',
+      (t) async {
+    t.view.devicePixelRatio = 1;
+    t.view.physicalSize = const Size(390, 844);
+    addTearDown(t.view.reset);
+    await mount(t);
+    await t.tap(find.byKey(const ValueKey('property-Labels')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField).last, 'Design');
+    t.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await t.pumpAndSettle();
+    expect(t.getBottomLeft(find.widgetWithText(FilledButton, 'Save')).dy,
+        lessThanOrEqualTo(544));
+    expect(t.takeException(), isNull);
+    await t.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
+    await t.pumpAndSettle();
+    expect(repo.writes, 0);
+  });
 }
