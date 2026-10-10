@@ -46,6 +46,9 @@ flutter:
   assets:
     - assets/mermaid/mermaid.min.js
     - assets/mermaid/renderer.js
+    - assets/editor/editor.js
+    - assets/editor/editor.css
+    - assets/editor/LICENSES.txt
     - assets/fonts/OFL.txt
   fonts:
     - family: NotoSansJP

@@ -115,8 +115,9 @@ class PreviewRepository implements WorkItemRepository, ProjectRepository {
         id: old.id,
         name: data['name'] as String? ?? old.name,
         sequenceId: old.sequenceId,
-        description: old.description,
-        descriptionHtml: old.descriptionHtml,
+        description: data['description_html'] as String? ?? old.description,
+        descriptionHtml:
+            data['description_html'] as String? ?? old.descriptionHtml,
         stateDetail: data.containsKey('state')
             ? candidates.firstWhere((x) => x.id == data['state'])
             : old.stateDetail,

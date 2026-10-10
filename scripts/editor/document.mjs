@@ -1,0 +1,251 @@
+import { Editor, Extension, Mark, Node } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import CodeBlock from '@tiptap/extension-code-block';
+import { TaskList, TaskItem } from '@tiptap/extension-list';
+import { TableKit } from '@tiptap/extension-table';
+
+export function safeLink(value) {
+  if (!value || /[\x00-\x20\\]/.test(value) || value.startsWith('//')) return false;
+  try {
+    const url = new URL(value, document.baseURI);
+    return ['https:', 'http:', 'mailto:'].includes(url.protocol);
+  } catch { return false; }
+}
+
+const knownTags = new Set('p h1 h2 h3 h4 h5 h6 blockquote ul ol li table tbody thead tfoot colgroup col tr td th pre code strong b em i u s strike del a br hr span'.split(' '));
+const inlineTags = new Set('span img a strong b em i u s strike del code br'.split(' '));
+const types = 'paragraph heading blockquote bulletList orderedList listItem taskList taskItem table tableRow tableCell tableHeader codeBlock code bold italic underline strike link hardBreak horizontalRule originalSpan'.split(' ');
+
+/** Import into an inert template. Original attributes and unsupported subtrees
+ * stay in private records, never in the live editable DOM. They are restored
+ * only when exporting a changed document. An untouched document is byte-exact. */
+export function createDocumentEditor(element, originalHtml, onChange = () => {}) {
+  const records = new Map();
+  let serializing = false;
+  let sequence = 0;
+
+  function prepare(html, preserve = true) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    function walk(parent, inline = false) {
+      for (const el of [...parent.children]) {
+        const tag = el.localName;
+        const custom = el.hasAttribute('data-type') &&
+          !['taskList', 'taskItem'].includes(el.getAttribute('data-type'));
+        // A schema cannot place arbitrary atoms inside list/row wrappers. Keep
+        // a nonstandard wrapper together instead of lifting/dropping its child.
+        const complexList = ['ul', 'ol'].includes(tag) && [...el.children].some(child =>
+          child.localName !== 'li' || (child.hasAttribute('data-type') && child.getAttribute('data-type') !== 'taskItem'));
+        const complexTable = tag === 'table' && [...el.querySelectorAll('caption,thead,tbody,tfoot,td,th')].some(child =>
+          child.localName === 'caption' ||
+          (['thead', 'tbody', 'tfoot'].includes(child.localName) && child.attributes.length > 0) ||
+          [...child.attributes].some(attr => ['colspan', 'rowspan'].includes(attr.name) && !/^[1-9]\d?$/.test(attr.value)));
+        const unsupported = !knownTags.has(tag) || custom || complexList || complexTable ||
+          (tag === 'a' && !safeLink(el.getAttribute('href')));
+        if (unsupported) {
+          if (!preserve) {
+            // Pasted active/media markup is not introduced into saved HTML.
+            el.replaceWith(document.createTextNode(
+              ['script', 'style', 'iframe', 'object', 'embed'].includes(tag) ? '' : el.textContent));
+            continue;
+          }
+          const key = String(++sequence);
+          records.set(key, { html: el.outerHTML });
+          const replacement = document.createElement(inline || inlineTags.has(tag) ? 'span' : 'div');
+          replacement.setAttribute('data-plane-preserved', key);
+          replacement.textContent = tag === 'img' ? 'Image · preserved' :
+            el.textContent?.trim().slice(0, 100) || `${tag} · preserved`;
+          el.replaceWith(replacement);
+          continue;
+        }
+        const attrs = Object.fromEntries([...el.attributes].map(a => [a.name, a.value]));
+        const key = preserve ? String(++sequence) : null;
+        if (key) records.set(key, { attrs, html: el.outerHTML });
+        if (key && tag === 'table') {
+          const colgroup = el.querySelector(':scope > colgroup');
+          if (colgroup) records.get(key).colgroup = colgroup.outerHTML;
+        }
+        for (const attr of [...el.attributes]) el.removeAttribute(attr.name);
+        if (key) el.setAttribute('data-plane-source', key);
+        // Only schema-owned, validated attributes enter the live editor.
+        if (tag === 'a') el.setAttribute('href', attrs.href);
+        if (tag === 'ol' && /^\d+$/.test(attrs.start ?? '')) el.setAttribute('start', attrs.start);
+        for (const name of ['colspan', 'rowspan']) {
+          if (['td', 'th'].includes(tag) && /^[1-9]\d?$/.test(attrs[name] ?? ''))
+            el.setAttribute(name, attrs[name]);
+        }
+        if (attrs['data-type'] === 'taskList' && tag === 'ul') el.setAttribute('data-type', 'taskList');
+        if (attrs['data-type'] === 'taskItem' && tag === 'li') {
+          el.setAttribute('data-type', 'taskItem');
+          el.setAttribute('data-checked', attrs['data-checked'] === 'true' ? 'true' : 'false');
+          // Tiptap/Plane task-list checkbox chrome is regenerated by TaskItem.
+          for (const child of [...el.children]) {
+            if (child.localName === 'label') child.remove();
+            if (child.localName === 'div' && !child.hasAttribute('data-type')) child.replaceWith(...child.childNodes);
+          }
+        }
+        if (tag === 'pre') {
+          const code = el.querySelector('code');
+          const codeAttrs = code ? Object.fromEntries([...code.attributes].map(a => [a.name, a.value])) : {};
+          const language = [attrs['data-language'], codeAttrs['data-language'],
+            ...(attrs.class ?? '').split(/\s+/).filter(c => c.startsWith('language-')).map(c => c.slice(9)),
+            ...(codeAttrs.class ?? '').split(/\s+/).filter(c => c.startsWith('language-')).map(c => c.slice(9))]
+            .find(v => v && /^[\w+-]+$/.test(v));
+          if (key) Object.assign(records.get(key), { codeAttrs, language });
+          for (const br of el.querySelectorAll('br')) br.replaceWith('\n');
+          const text = el.textContent;
+          el.replaceChildren();
+          const cleanCode = document.createElement('code');
+          if (language) cleanCode.className = `language-${language}`;
+          cleanCode.textContent = text;
+          el.append(cleanCode);
+        } else {
+          walk(el, inline || ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag));
+        }
+      }
+    }
+    walk(template.content);
+    return template.innerHTML;
+  }
+
+  const originals = Extension.create({
+    name: 'originalAttributes',
+    addGlobalAttributes: () => [{ types, attributes: { sourceKey: {
+      default: null, keepOnSplit: false,
+      parseHTML: el => el.getAttribute('data-plane-source'),
+      renderHTML: attrs => serializing && attrs.sourceKey
+        ? { 'data-plane-source': attrs.sourceKey } : {},
+    } } }],
+  });
+  function preserved(inline) {
+    return Node.create({
+      name: inline ? 'preservedInline' : 'preservedBlock',
+      group: inline ? 'inline' : 'block', inline, atom: true, selectable: true,
+      addAttributes: () => ({ key: { default: null, parseHTML: el => el.getAttribute('data-plane-preserved') } }),
+      parseHTML: () => [{ tag: `${inline ? 'span' : 'div'}[data-plane-preserved]`, priority: 100 }],
+      renderHTML: ({ node }) => [inline ? 'span' : 'div', {
+        class: 'preserved-content', contenteditable: 'false',
+        ...(serializing ? { 'data-plane-preserved': node.attrs.key } : {}),
+      }, records.get(node.attrs.key)?.html?.includes('<img') ? 'Image · preserved' : 'Existing content · preserved'],
+    });
+  }
+  const originalSpan = Mark.create({
+    name: 'originalSpan',
+    excludes: '',
+    parseHTML: () => [{ tag: 'span[data-plane-source]' }],
+    renderHTML: ({ HTMLAttributes }) => ['span', HTMLAttributes, 0],
+  });
+  const codeBlock = CodeBlock.extend({
+    renderHTML: ({ node, HTMLAttributes }) => ['pre', {
+      ...HTMLAttributes,
+      ...(serializing ? { 'data-plane-language': node.attrs.language ?? '' } : {}),
+    }, ['code', node.attrs.language ? { class: `language-${node.attrs.language}` } : {}, 0]],
+  });
+  const content = prepare(originalHtml);
+  const editor = new Editor({
+    element, injectCSS: false, content,
+    extensions: [
+      StarterKit.configure({ codeBlock: false, trailingNode: false,
+        link: { openOnClick: false, autolink: false, linkOnPaste: false,
+          isAllowedUri: safeLink, HTMLAttributes: { target: null, rel: null } } }),
+      codeBlock, TaskList, TaskItem.configure({ nested: true }),
+      TableKit.configure({ table: { resizable: false } }),
+      originals, originalSpan, preserved(false), preserved(true),
+    ],
+    editorProps: {
+      attributes: { role: 'textbox', 'aria-label': 'Work item description', 'aria-multiline': 'true', spellcheck: 'true' },
+      transformPastedHTML: html => prepare(html, false),
+      handleDOMEvents: { drop: (_view, event) => {
+        // Attachments require a separate upload flow; never insert local files.
+        if (event.dataTransfer?.files.length) { event.preventDefault(); return true; }
+        return false;
+      } },
+    },
+    onUpdate: onChange,
+  });
+  const initial = editor.state.doc;
+  const initialNodes = new Map();
+  initial.descendants(node => {
+    if (node.attrs.sourceKey) initialNodes.set(node.attrs.sourceKey, node);
+  });
+  function changed() { return !editor.state.doc.eq(initial); }
+  function html() {
+    if (!changed()) return originalHtml;
+    let serialized;
+    serializing = true;
+    try { serialized = editor.getHTML(); } finally { serializing = false; }
+    const template = document.createElement('template');
+    template.innerHTML = serialized;
+    const unchanged = new Set();
+    editor.state.doc.descendants(node => {
+      const original = initialNodes.get(node.attrs.sourceKey);
+      if (original && node.eq(original)) unchanged.add(node.attrs.sourceKey);
+    });
+    const raw = new WeakMap();
+    function rawToken(value) {
+      const marker = template.content.ownerDocument.createComment('');
+      raw.set(marker, value);
+      return marker;
+    }
+    for (const el of template.content.querySelectorAll('[data-plane-source]')) {
+      if (!template.content.contains(el)) continue;
+      const key = el.getAttribute('data-plane-source');
+      const record = records.get(key);
+      // Preserve unedited nodes as a whole, even while another paragraph is
+      // changed. This also keeps schema-invisible wrappers/attributes intact.
+      if (unchanged.has(key) && record?.html) {
+        el.replaceWith(rawToken(record.html));
+        continue;
+      }
+      el.removeAttribute('data-plane-source');
+      const language = el.getAttribute('data-plane-language');
+      el.removeAttribute('data-plane-language');
+      for (const [name, value] of Object.entries(record?.attrs ?? {})) {
+        if (['href', 'colspan', 'rowspan', 'start', 'data-checked', 'data-type'].includes(name)) continue;
+        el.setAttribute(name, value);
+      }
+      if (el.localName === 'pre') {
+        const code = el.querySelector('code');
+        for (const [name, value] of Object.entries(record?.codeAttrs ?? {})) code.setAttribute(name, value);
+        if (language !== (record?.language ?? '')) {
+          for (const target of [el, code]) {
+            target.removeAttribute('data-language');
+            target.className = target.className.split(/\s+/).filter(c => c && !c.startsWith('language-')).join(' ');
+            if (!target.className) target.removeAttribute('class');
+          }
+          if (language) code.classList.add(`language-${language}`);
+        }
+      }
+      if (el.localName === 'table' && record?.colgroup) {
+        const original = document.createElement('template');
+        original.innerHTML = record.colgroup;
+        const generated = el.querySelector(':scope > colgroup');
+        if (generated && generated.children.length === original.content.firstElementChild.children.length)
+          generated.replaceWith(rawToken(record.colgroup));
+      }
+    }
+    // New code nodes have no source record.
+    for (const el of template.content.querySelectorAll('[data-plane-language]')) el.removeAttribute('data-plane-language');
+    for (const el of template.content.querySelectorAll('[data-plane-preserved]')) {
+      const value = records.get(el.getAttribute('data-plane-preserved'))?.html;
+      el.replaceWith(rawToken(value ?? ''));
+    }
+    // Restore by DOM identity, never by replacing strings that could also
+    // appear in user text or attribute values. Serialize only detached nodes.
+    const voidTags = new Set('area base br col embed hr img input link meta param source track wbr'.split(' '));
+    function serialize(node) {
+      if (raw.has(node)) return raw.get(node);
+      if (node.nodeType === 1) {
+        const empty = node.cloneNode(false).outerHTML;
+        const closing = `</${node.localName}>`;
+        if (voidTags.has(node.localName)) return empty;
+        return empty.slice(0, -closing.length) + [...node.childNodes].map(serialize).join('') + closing;
+      }
+      const holder = document.createElement('template');
+      holder.content.append(node.cloneNode(false));
+      return holder.innerHTML;
+    }
+    return [...template.content.childNodes].map(serialize).join('');
+  }
+  return { editor, changed, html };
+}

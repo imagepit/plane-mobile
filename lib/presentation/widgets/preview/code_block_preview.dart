@@ -77,6 +77,8 @@ String sanitizeWebHtml(String html) {
   const attributes = {
     'class',
     'data-language',
+    'data-type',
+    'data-checked',
     'title',
     'colspan',
     'rowspan',
@@ -108,12 +110,43 @@ class RichHtml extends StatelessWidget {
     return HtmlWidget(
       kIsWeb ? sanitizeWebHtml(html) : html,
       textStyle: textStyle,
-      customStylesBuilder: (element) => kIsWeb &&
-              const {'pre', 'code', 'kbd', 'samp', 'tt'}
-                  .contains(element.localName)
-          ? {'font-family': 'monospace, ${AppTypography.webFontFamily}'}
-          : null,
-      customWidgetBuilder: codeBlockPreviewBuilder,
+      customStylesBuilder: (element) {
+        if (element.localName == 'ul' &&
+            element.attributes['data-type'] == 'taskList') {
+          return {'list-style-type': 'none', 'padding-left': '0'};
+        }
+        return kIsWeb &&
+                const {'pre', 'code', 'kbd', 'samp', 'tt'}
+                    .contains(element.localName)
+            ? {'font-family': 'monospace, ${AppTypography.webFontFamily}'}
+            : null;
+      },
+      customWidgetBuilder: (element) {
+        if (element.localName == 'li' &&
+            element.attributes['data-type'] == 'taskItem') {
+          final body = parser.parseFragment(element.innerHtml);
+          for (final label in body.querySelectorAll('label')) {
+            label.remove();
+          }
+          final checked = element.attributes['data-checked'] == 'true';
+          return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child:
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(
+                    checked
+                        ? Icons.check_box_outlined
+                        : Icons.check_box_outline_blank,
+                    semanticLabel:
+                        checked ? 'Completed task' : 'Incomplete task',
+                    size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: RichHtml(html: body.outerHtml, textStyle: textStyle))
+              ]));
+        }
+        return codeBlockPreviewBuilder(element);
+      },
     );
   }
 }
