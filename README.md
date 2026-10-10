@@ -248,45 +248,31 @@ npm run dev:web -- --port 8890
 
 配備用スクリプトはbase・manifest・参照ファイル・ヘッダーを検査し、未使用の`flutter_service_worker.js`とFlutterの`.last_build_id`を除外します。独自bootstrapにはService Worker登録がありません。ローカル設定、symlink、想定外のパス、25 MiBを超えるファイル、20,000件を超える成果物は拒否します。`_release.json`にsource SHAと全配備ファイルのSHA-256を保存します。ビルド時のdefineへPATやスモーク設定を渡さないでください。ファイル名の検査だけで、任意のファイルに埋め込まれた秘密を検出できるわけではありません。
 
-### 配備前の準備と記録
+### 本番配備の設定
 
-運用担当はGitHub Environment **`plane-mobile-production`**を作り、配備を承認するreviewerとmain限定のdeployment branchを設定してください。利用しているGitHubプランでEnvironmentの保護を設定できることも確認します。設定できない場合は配備を止め、承認方法を決めてから進めてください。
+GitHub Environment **`plane-mobile-production`**はmain限定のdeployment branchを維持し、required reviewersとwait timerは設定しません。通常の更新では、良輔がPRをmainへmergeしたことを公開の判断とし、追加の承認や配備前確認の入力を要求しません。
 
-このEnvironmentだけにsecret **`CLOUDFLARE_API_TOKEN`**とvariable **`CLOUDFLARE_ACCOUNT_ID`**を登録します。tokenの権限は対象アカウントのWorkers Scripts編集、`itpit.net`のWorkers Routes編集・Zone読取りに限定します。値は運用担当が登録し、コード・チャット・ログへ貼りません。PR用のWeb checksにはEnvironmentも配備secretも渡しません。
+このEnvironmentだけにsecret **`CLOUDFLARE_API_TOKEN`**とvariable **`CLOUDFLARE_ACCOUNT_ID`**を登録します。tokenの権限は対象アカウントのWorkers Scripts編集、`itpit.net`のWorkers Routes編集・Zone読取りに限定します。値をコード・チャット・ログへ貼りません。PR用のWeb checksにはEnvironmentも配備secretも渡しません。
 
-本番配備前に、次の結果と日時を[CORE-53（PWA親項目）](https://plane.itpit.net/imagepit/browse/CORE-53/)のコメントへ残します。
+DNS・Route・Accessを変更する場合は、変更前後の経路と保護を確認します。Accessは`/mobile/*`の本人限定保護を維持し、`/api/v1/`は既存PAT認証を維持します。通常のアプリ更新に、初回導入時の確認入力を繰り返しません。
 
-1. `plane.itpit.net`のDNSがproxiedで、既存Tunnelへの向き先を維持している。
-2. Accessの許可policyと対象host/pathを確認し、`/mobile/`と`/api/v1/`が本人限定の保護範囲に含まれる。より具体的なpathのBypass、別policy、サービス認証の例外も確認する。
-3. 現在の経路で未認証・本人以外による`/mobile/`と`/api/v1/`の取得が拒否される。実際の別本人の認証を試せない場合は未確認とし、成功扱いにしない。
-4. 既存Workers Routeとの競合がなく、最小権限と成果物の容量上限を満たす。
-5. mainへmergeされ、そのSHAのWeb checksが成功している。Environmentの承認と配備認証の登録が済んでいる。
+### mainの検査成功後に自動配備
 
-記録が揃うまで本番Routeの追加・配備を実行しません。Route追加前の拒否確認は、追加後の静的ファイル保護を証明するものではありません。配備直後にもHTML・JS・manifest・アイコンとAPIについて未認証・本人以外の取得拒否を確認します。取得できてしまう場合は新規Routeを外して既存経路へ戻し、配信成功にせず親コメントへ記録します。初回配備には過去のWorker versionがないため、この退避手順を使います。Accessを緩めて復旧しないでください。
+PRをmainへmergeすると、`Web checks`が試験・releaseビルド・成果物保存を実行します。成功すると**Deploy Web**が自動で本番へ配備します。SHA・確認URLの入力やEnvironment承認は不要です。検査失敗、PRの検査、main以外の検査では配備しません。Web checksとDeploy Webは別の実行としてActionsに表示されます。
 
-Access設定を追加・変更する前に、既存のpublic APIクライアントを確認してください。本人用のブラウザー認証とAPIクライアントの認証を混同せず、影響を確認できるまで変更を止めます。既存RunnerはTailscale内のprivate gatewayからNodePortへ接続する経路を維持します。通常のRoute管理はWranglerに任せます。緊急退避でRouteを外した後は配備を停止し、原因の修復と配備前確認・人の承認が揃った場合だけ再配備してください。
+配備対象は成功したmain push検査の同じSHA・同じrunの成果物です。artifact ID・名前・SHA・archive digestを照合し、展開後も`_release.json`と全ファイルのhashを検査します。欠落・期限切れ・不一致では配備を止めます。対象SHAの配備設定とnpm lockを使用し、再ビルドしません。artifactの保持期間は90日です。配備secretを使うのは最後のWrangler配備ステップだけです。
 
-### 検査済み成果物の手動配備・更新
+配備は同時実行せず、実行中の配備を新しい依頼で取り消しません。古い検査が遅れて完了した場合、そのSHAが最新mainでなければ自動配備を省略します。配備成功後は作業内容を保存し、Safariで再読み込みするか、ホーム画面のPWAを完全終了して開き直してください。
 
-`Web checks`はPRとmainのpushで検査し、成功時だけ`pwa-<40桁SHA>`を保存します。artifactの保持期間は90日です。PRの成果物は配備に使いません。
+### 手動の再配備
 
-GitHub Actionsの**Deploy Web manually**をmainから実行し、次を入力します。
+復旧・再配備にはGitHub Actionsの**Deploy Web**をmainから手動実行します。`sha`だけを入力し、空欄なら実行時の最新mainを使います。以前の検査済みmain SHAも指定できます。手動配備でも成功したmain検査の成果物だけを使い、同じSHA・digest・全ファイルの照合を行います。
 
-- `sha`: 配備したい、Web checks成功済みのmainの40桁SHA
-- `preflight_record`: CORE-53に保存した配備前確認コメントのURL
-- `preflight_confirmed`: 上記の確認がすべて済んだ場合だけtrue
-
-確認欄とURLは運用担当による申告です。workflowはPlaneコメント本文を自動で検証しません。Environmentの承認者は記録を読んでから承認してください。
-
-workflowは指定SHAをcheckoutし、main履歴への所属と、そのSHAのmain push検査成功を確認します。そのrunのartifact ID・名前・SHA・archive digestを照合し、展開後も`_release.json`と全ファイルのhashを検査します。一つでも一致しない、成果物が期限切れ、欠落している場合は配備を止めます。対象SHAの配備設定とnpm lockを使用し、再ビルドはしません。配備secretを使うのは最後のWrangler配備ステップだけです。
-
-更新は新しい検査済みmain SHAで同じ操作を行います。開いたままの画面は現在のコードで動くため、作業内容を保存してからSafariで再読み込みしてください。配備前後のSHA、Web checks run、artifact IDとdigest、Cloudflare version ID、HTTPヘッダー、画面、既存デスクトップ/API/Runnerの結果をCORE-55へ記録します。
-
-配備直後に本番のCSP・nosniff・Referrer-Policy・cacheの実応答を照合し、未適用なら配信成功にせず退避・rollbackしてください。配備workflowは一つずつ実行し、実行中の配備は新しい依頼で取り消しません。
+配備runのSummaryにsource SHA・Web checks run・artifact ID・archive digestを、Wranglerのログにversion IDを保存します。配備後に表示・Access保護・既存API経路の問題が見つかった場合は、次の手順で復旧します。Accessを緩めて復旧しません。
 
 ### ロールバック
 
-通常は、保存期間内の以前の検査済みmain SHAを**Deploy Web manually**へ指定し、同じ成果物を再配備します。以前の`wrangler.jsonc`も使用するので、Route・配備設定の差分を先に確認してください。期限切れや削除済みのartifactは再ビルドして代用しません。
+通常は、保存期間内の以前の検査済みmain SHAを**Deploy Web**へ指定し、同じ成果物を再配備します。以前の`wrangler.jsonc`も使用するので、Route・配備設定の差分を先に確認してください。期限切れや削除済みのartifactは再ビルドして代用しません。
 
 緊急時は、配備記録でSHAと対応を確認したCloudflare version IDを使い、運用担当が以下を実行します。現在版と戻し先を必ず明示し、直前版へ暗黙に戻す運用は避けてください。
 
