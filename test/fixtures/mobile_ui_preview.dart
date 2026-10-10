@@ -294,6 +294,32 @@ void main() {
       repo.items.last
     ];
   }
+  if (params['rich'] == '1') {
+    repo.items = [
+      repo.items.first.copyWith(
+          name: '本文の図とツリー表示',
+          descriptionHtml:
+              '<h2>依存図</h2><pre><code class="language-mermaid">flowchart RL\n'
+              'subgraph dispatcher["imagepit/imagepit"]\ncheck["実装計画の検査"]\nend\n'
+              'subgraph canary["plane-dispatcher-canary"]\n'
+              'proof["★新規 core8-plan-proof.txt"]\nreport["★新規 core8-required-report.txt"]\nend\n'
+              'check -.-> proof\ncheck -.-> report</code></pre>'
+              '<h2>ツリー差分</h2><pre data-language="tree"><code>.\n'
+              '└── canary/\n    └── plane-dispatcher-canary/\n'
+              '        ├── ++ core8-plan-proof.txt &lt;--[計画内ファイル]\n'
+              '        └── ++ core8-required-report.txt &lt;--[必須の報告]</code></pre>'),
+      repo.items.last,
+    ];
+  }
+  if (params['rich'] == 'invalid') {
+    repo.items = [
+      repo.items.first.copyWith(
+          name: '構文エラーの表示確認',
+          descriptionHtml:
+              '<pre><code class="language-mermaid">not a valid diagram</code></pre>'),
+      repo.items.last
+    ];
+  }
   registerPreview(repo);
   runApp(previewApp(createPreviewRouter(),
       dark: params['theme'] == 'dark' ||
