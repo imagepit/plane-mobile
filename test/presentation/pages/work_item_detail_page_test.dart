@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plane_mobile/core/di/injection.dart';
@@ -141,7 +142,7 @@ void main() {
     await mount(t);
     await t.tap(find.byType(PopupMenuButton<String>));
     await t.pumpAndSettle();
-    await t.tap(find.text('Edit title'));
+    await t.tap(find.text('Edit work item'));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('edit-title')), '編集途中の日本語');
     bloc.add(
@@ -149,7 +150,7 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('編集途中の日本語'), findsOneWidget);
     repo.forbidden = true;
-    await t.tap(find.widgetWithText(FilledButton, 'Save'));
+    await t.tap(find.widgetWithText(TextButton, 'Save'));
     await t.pumpAndSettle();
     expect(find.text('編集途中の日本語'), findsOneWidget);
     expect(bloc.state.workItem!.name, previewItems.first.name);
@@ -157,7 +158,32 @@ void main() {
     await t.tap(find.widgetWithText(TextButton, 'Cancel'));
     await t.pumpAndSettle();
     expect(repo.writes, writes);
-  });
+  }, skip: kIsWeb); // DOM editor behavior is covered by the JavaScript suite.
+  testWidgets('body tap opens editor; title-only PATCH leaves rich HTML intact',
+      (t) async {
+    const original =
+        '<p>本文</p><pre data-language="tree"><code>└── 日本語.dart</code></pre>';
+    repo.items[0] = repo.items[0].copyWith(descriptionHtml: original);
+    await mount(t);
+    await t.tap(find.byKey(const ValueKey('edit-work-item-description')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('edit-title')), 'タイトルを更新');
+    await t.tap(find.widgetWithText(TextButton, 'Save'));
+    await t.pumpAndSettle();
+    expect(repo.lastWrite, {'name': 'タイトルを更新'});
+    expect(bloc.state.workItem!.descriptionHtml, original);
+    expect(find.byKey(const ValueKey('edit-title')), findsNothing);
+    expect(find.text('タイトルを更新'), findsOneWidget);
+  }, skip: kIsWeb);
+  testWidgets('unchanged Save closes editor without a write', (t) async {
+    await mount(t);
+    await t.tap(find.byKey(const ValueKey('edit-work-item-title')));
+    await t.pumpAndSettle();
+    await t.tap(find.widgetWithText(TextButton, 'Save'));
+    await t.pumpAndSettle();
+    expect(repo.writes, 0);
+    expect(find.byKey(const ValueKey('edit-title')), findsNothing);
+  }, skip: kIsWeb);
   testWidgets('candidate search sheet keeps Save above the keyboard',
       (t) async {
     t.view.devicePixelRatio = 1;

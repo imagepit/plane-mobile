@@ -32,6 +32,10 @@ jobs:
           node-version: '22.22.2'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: 本文エディタの試験・同梱asset照合
+        run: |
+          npm run test:editor
+          npm run check:editor
       - name: Mermaid描画の通信・設定防御試験
         run: node --test test/web/mermaid_renderer_test.cjs
       - run: flutter pub get --enforce-lockfile

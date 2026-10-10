@@ -9,6 +9,21 @@ import 'package:plane_mobile/presentation/widgets/preview/file_tree_view.dart';
 import 'package:plane_mobile/presentation/widgets/preview/mermaid_view.dart';
 
 void main() {
+  testWidgets('saved task lists display checked and unchecked states',
+      (tester) async {
+    await tester
+        .pumpWidget(const MaterialApp(home: Scaffold(body: RichHtml(html: '''
+<ul data-type="taskList">
+<li data-type="taskItem" data-checked="true"><label><input type="checkbox"></label><div><p>完了済み</p></div></li>
+<li data-type="taskItem" data-checked="false"><label><input type="checkbox"></label><div><p>未完了</p></div></li>
+</ul>'''))));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check_box_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.check_box_outline_blank), findsOneWidget);
+    expect(find.text('完了済み', findRichText: true), findsOneWidget);
+    expect(find.text('未完了', findRichText: true), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   test(
       'tree and mermaid languages on pre or code and data-language are recognised',
       () {

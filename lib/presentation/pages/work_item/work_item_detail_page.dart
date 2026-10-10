@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plane_mobile/core/di/injection.dart';
+import 'package:plane_mobile/domain/entities/work_item.dart' as entities;
+import 'package:plane_mobile/presentation/widgets/editor/work_item_editor.dart';
 import 'package:plane_mobile/presentation/blocs/work_item/work_item_bloc.dart';
 import 'package:plane_mobile/presentation/widgets/navigation/mobile_shell.dart';
 import 'package:plane_mobile/presentation/widgets/preview/code_block_preview.dart';
@@ -73,15 +75,8 @@ class WorkItemDetailView extends StatefulWidget {
 }
 
 class _WorkItemDetailViewState extends State<WorkItemDetailView> {
-  final _title = TextEditingController();
-  bool _editing = false, _saving = false;
+  bool _editorOpen = false, _saving = false;
   Map<String, dynamic>? _failedField;
-  @override
-  void dispose() {
-    _title.dispose();
-    super.dispose();
-  }
-
   WorkItemBloc get bloc => context.read<WorkItemBloc>();
   LoadWorkItemDetail get reload => LoadWorkItemDetail(
       workspaceSlug: widget.workspaceSlug,
@@ -102,7 +97,8 @@ class _WorkItemDetailViewState extends State<WorkItemDetailView> {
           '/workspaces/${widget.workspaceSlug}/projects/${widget.projectId}/items');
   }
 
-  Future<bool> _update(Map<String, dynamic> data) async {
+  Future<bool> _update(Map<String, dynamic> data,
+      {bool remember = true}) async {
     if (_saving) return false;
     setState(() => _saving = true);
     final success = await bloc.execute(UpdateWorkItemEvent(
@@ -113,9 +109,38 @@ class _WorkItemDetailViewState extends State<WorkItemDetailView> {
     if (!mounted) return success;
     setState(() {
       _saving = false;
-      _failedField = success ? null : Map.of(data);
+      _failedField = success || !remember ? null : Map.of(data);
     });
     return success;
+  }
+
+  Future<void> _editContent(entities.WorkItem item,
+      {bool focusTitle = false}) async {
+    if (_editorOpen || _saving || bloc.state.busy) return;
+    _editorOpen = true;
+    final targetBloc = bloc;
+    final identifier = MobileShell.maybeOf(context)?.session?.identifier;
+    try {
+      await showWorkItemEditor(context,
+          title: item.name,
+          html: item.descriptionHtml ?? item.description ?? '',
+          identifier: identifier == null || identifier.isEmpty
+              ? item.displayId
+              : '$identifier-${item.sequenceId}',
+          focusTitle: focusTitle, onSave: (title, changedHtml) async {
+        final patch = <String, dynamic>{
+          if (title != item.name) 'name': title,
+          if (changedHtml != null) 'description_html': changedHtml,
+        };
+        if (patch.isEmpty) return null;
+        final saved = await _update(patch, remember: false);
+        return saved
+            ? null
+            : targetBloc.state.error ?? 'Could not save. Please try again.';
+      });
+    } finally {
+      _editorOpen = false;
+    }
   }
 
   Future<CommentCheckResult> _checkComments() async {
@@ -164,10 +189,7 @@ class _WorkItemDetailViewState extends State<WorkItemDetailView> {
                         enabled: !busy,
                         onSelected: (v) async {
                           if (v == 'edit' && item != null)
-                            setState(() {
-                              _title.text = item.name;
-                              _editing = true;
-                            });
+                            _editContent(item, focusTitle: true);
                           if (v == 'delete') {
                             final confirmed = await showDialog<bool>(
                                 context: context,
@@ -194,7 +216,7 @@ class _WorkItemDetailViewState extends State<WorkItemDetailView> {
                         },
                         itemBuilder: (_) => [
                               const PopupMenuItem(
-                                  value: 'edit', child: Text('Edit title')),
+                                  value: 'edit', child: Text('Edit work item')),
                               const PopupMenuItem(
                                   value: 'delete', child: Text('Delete'))
                             ])
@@ -247,64 +269,55 @@ class _WorkItemDetailViewState extends State<WorkItemDetailView> {
                                 identifier: MobileShell.maybeOf(context)
                                     ?.session
                                     ?.identifier),
-                            if (_editing)
-                              Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16),
-                                  child: Column(children: [
-                                    TextField(
-                                        key: const ValueKey('edit-title'),
-                                        controller: _title,
-                                        enabled: !busy,
-                                        maxLines: null,
-                                        decoration: const InputDecoration(
-                                            labelText: 'Title')),
-                                    Row(children: [
-                                      TextButton(
-                                          onPressed: busy
-                                              ? null
-                                              : () => setState(() {
-                                                    _editing = false;
-                                                    _failedField = null;
-                                                  }),
-                                          child: const Text('Cancel')),
-                                      FilledButton(
-                                          onPressed: busy
-                                              ? null
-                                              : () async {
-                                                  if (_title.text
-                                                      .trim()
-                                                      .isEmpty) return;
-                                                  final saved = await _update({
-                                                    'name': _title.text.trim()
-                                                  });
-                                                  if (saved && mounted)
-                                                    setState(
-                                                        () => _editing = false);
-                                                },
-                                          child: const Text('Save'))
-                                    ])
-                                  ]))
-                            else
-                              Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16),
-                                  child: Text(item.name,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .headlineSmall)),
+                            Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: GestureDetector(
+                                    key: const ValueKey('edit-work-item-title'),
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: busy
+                                        ? null
+                                        : () => _editContent(item,
+                                            focusTitle: true),
+                                    child: Semantics(
+                                        button: true,
+                                        label: 'Edit work item title',
+                                        child: Text(item.name,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .headlineSmall)))),
                             const SizedBox(height: 12),
-                            if ((item.descriptionHtml ?? item.description ?? '')
-                                .isNotEmpty)
-                              Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16),
-                                  child: RichHtml(
-                                      html: item.descriptionHtml ??
-                                          item.description!,
-                                      textStyle: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge)),
+                            Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: GestureDetector(
+                                    key: const ValueKey(
+                                        'edit-work-item-description'),
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap:
+                                        busy ? null : () => _editContent(item),
+                                    child: Semantics(
+                                        button: true,
+                                        label: 'Edit work item description',
+                                        child: ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                                minHeight: 60,
+                                                minWidth: double.infinity),
+                                            child: (item.descriptionHtml ??
+                                                        item.description ??
+                                                        '')
+                                                    .isEmpty
+                                                ? Text('Add description',
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .bodyLarge
+                                                        ?.copyWith(
+                                                            color: Theme.of(context)
+                                                                .colorScheme
+                                                                .onSurfaceVariant))
+                                                : RichHtml(
+                                                    html: item.descriptionHtml ?? item.description!,
+                                                    textStyle: Theme.of(context).textTheme.bodyLarge))))),
                             const SizedBox(height: 24),
                             if (s.error != null)
                               Padding(
