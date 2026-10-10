@@ -1,3 +1,4 @@
+import 'work_item_remote_datasource.dart';
 import 'package:plane_mobile/core/network/dio_client.dart';
 import 'package:plane_mobile/data/models/label_model.dart';
 
@@ -11,16 +12,14 @@ class LabelRemoteDataSource {
     String workspaceSlug,
     String projectId,
   ) async {
-    final response = await _dioClient.get<Map<String, dynamic>>(
-      '/api/v1/workspaces/$workspaceSlug/projects/$projectId/labels/',
+    return readAllCursorPages(
+      (cursor) async => (await _dioClient.get<Map<String, dynamic>>(
+        '/api/v1/workspaces/$workspaceSlug/projects/$projectId/labels/',
+        queryParameters: {if (cursor != null) 'cursor': cursor},
+      ))
+          .data,
+      WorkItemLabelModel.fromJson,
+      (item) => item.id,
     );
-    final body = response.data;
-    final data = body == null
-        ? const <dynamic>[]
-        : (body['results'] as List<dynamic>? ?? const <dynamic>[]);
-    return data
-        .map((json) =>
-            WorkItemLabelModel.fromJson(json as Map<String, dynamic>))
-        .toList();
   }
 }

@@ -54,9 +54,9 @@ class AppTypography {
           height: 1.27,
         ),
         titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.15,
+          fontSize: 17,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
           height: 1.5,
         ),
         titleSmall: TextStyle(
@@ -68,7 +68,7 @@ class AppTypography {
         bodyLarge: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w400,
-          letterSpacing: 0.5,
+          letterSpacing: 0,
           height: 1.5,
         ),
         bodyMedium: TextStyle(

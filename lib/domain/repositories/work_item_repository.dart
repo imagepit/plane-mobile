@@ -1,10 +1,13 @@
+import 'package:plane_mobile/domain/entities/work_item_page.dart';
+import 'package:plane_mobile/domain/entities/comment_page.dart';
 import 'package:dartz/dartz.dart';
 import 'package:plane_mobile/core/errors/failures.dart';
 import 'package:plane_mobile/domain/entities/work_item.dart';
 
 abstract class WorkItemRepository {
-  Future<Either<Failure, List<WorkItem>>> getWorkItems(
-      String workspaceSlug, String projectId);
+  Future<Either<Failure, WorkItemPage>> getWorkItems(
+      String workspaceSlug, String projectId,
+      {String? cursor});
   Future<Either<Failure, WorkItem>> getWorkItem(
       String workspaceSlug, String projectId, String itemId);
   Future<Either<Failure, WorkItem>> createWorkItem(
@@ -19,8 +22,9 @@ abstract class WorkItemRepository {
       String workspaceSlug, String projectId);
   Future<Either<Failure, List<WorkItemMember>>> getMembers(
       String workspaceSlug, String projectId);
-  Future<Either<Failure, List<Comment>>> getComments(
-      String workspaceSlug, String projectId, String itemId);
-  Future<Either<Failure, Comment>> addComment(
-      String workspaceSlug, String projectId, String itemId, String commentHtml);
+  Future<Either<Failure, CommentPage>> getComments(
+      String workspaceSlug, String projectId, String itemId,
+      {String? cursor});
+  Future<Either<Failure, Comment>> addComment(String workspaceSlug,
+      String projectId, String itemId, String commentHtml);
 }

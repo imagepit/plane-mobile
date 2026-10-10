@@ -6,7 +6,6 @@ import 'package:plane_mobile/app.dart' as app;
 import 'package:plane_mobile/core/di/injection.dart';
 import 'package:plane_mobile/core/network/dio_client.dart';
 import 'package:plane_mobile/core/storage/local_storage.dart';
-import 'package:plane_mobile/presentation/widgets/work_item/comment_section.dart';
 
 /// 自社CE（Plane CE v1.4.1）に対するスモークテスト。
 ///
@@ -30,7 +29,8 @@ void main() {
 
   testWidgets('smoke: 設定→接続→一覧→作成→コメント→削除', (tester) async {
     expect(baseUrl, isNotEmpty, reason: 'SMOKE_BASE_URL が必要');
-    expect(apiToken, isNotEmpty, reason: 'SMOKE_API_TOKEN が smoke.local.json に必要');
+    expect(apiToken, isNotEmpty,
+        reason: 'SMOKE_API_TOKEN が smoke.local.json に必要');
     expect(workspaceSlug, isNotEmpty, reason: 'SMOKE_WORKSPACE_SLUG が必要');
     expect(projectId, isNotEmpty, reason: 'SMOKE_PROJECT_ID が必要');
 
@@ -67,52 +67,65 @@ void main() {
     await _wait(tester, seconds: 4);
 
     // --- Workspace → Project → Work Items の一覧表示 ---
-    expect(find.text(workspaceSlug), findsWidgets, reason: '設定済み slug の Workspace が表示される');
+    expect(find.text(workspaceSlug), findsWidgets,
+        reason: '設定済み slug の Workspace が表示される');
     await tester.tap(find.text(workspaceSlug).first);
     await _wait(tester, seconds: 3);
     expect(find.text(projectName), findsOneWidget, reason: '試験Project が表示される');
     await tester.tap(find.text(projectName));
     await _wait(tester, seconds: 3);
-    expect(find.text('Work Items'), findsOneWidget);
+    expect(find.text('Work items'), findsOneWidget);
     // ignore: avoid_print
     print('SMOKE OK: projects / work items listing');
 
     final dio = sl<DioClient>();
-    String listPath() => '/api/v1/workspaces/$workspaceSlug/projects/$projectId/'
+    String listPath() =>
+        '/api/v1/workspaces/$workspaceSlug/projects/$projectId/'
         'work-items/?expand=state,assignees,labels';
 
     Future<String?> findItemIdByName(String title) async {
-      final res = await dio.get<Map<String, dynamic>>(listPath());
-      // ignore: avoid_print
-      print('SMOKE API: GET work-items -> HTTP ${res.statusCode}');
-      final results = res.data?['results'] as List<dynamic>? ?? const [];
-      for (final item in results) {
-        if ((item as Map<String, dynamic>)['name'] == title) {
-          return item['id'] as String?;
+      String? cursor;
+      final seen = <String>{};
+      do {
+        final res = await dio.get<Map<String, dynamic>>(listPath(),
+            queryParameters: {if (cursor != null) 'cursor': cursor});
+        // ignore: avoid_print
+        print('SMOKE API: GET work-items -> HTTP ${res.statusCode}');
+        final results = res.data?['results'] as List<dynamic>? ?? const [];
+        for (final item in results) {
+          if ((item as Map<String, dynamic>)['name'] == title)
+            return item['id'] as String?;
         }
-      }
+        if (res.data?['next_page_results'] != true) break;
+        cursor = res.data?['next_cursor'] as String?;
+        expect(cursor, isNotNull);
+        expect(seen.add(cursor!), true, reason: 'cursorが繰り返されないこと');
+      } while (true);
       return null;
     }
 
     // --- Work Item 作成 ---
     final title = 'smoke-${DateTime.now().millisecondsSinceEpoch}';
-    await tester.tap(find.byType(FloatingActionButton));
+    await tester.tap(find.byKey(const ValueKey('create-work-item')));
     await _wait(tester, seconds: 2);
     final createPage = find.text('Create Work Item');
     // ignore: avoid_print
     print('SMOKE DBG: create page present=${createPage.evaluate().isNotEmpty} '
         'formFields=${find.byType(TextFormField).evaluate().length}');
-    await tester.enterText(find.byType(TextFormField).at(0), title);
-    final createButton = find.widgetWithText(TextButton, 'Create');
+    await tester.enterText(
+        find.byKey(const ValueKey('new-work-item-title')), title);
+    final createButton = find.byKey(const ValueKey('save-new-work-item'));
     final enabled = createButton.evaluate().isEmpty
         ? 'button not found'
         : '${tester.widget<TextButton>(createButton).onPressed != null}';
     // ignore: avoid_print
-    print('SMOKE DBG: create button found=${createButton.evaluate().length} enabled=$enabled');
+    print(
+        'SMOKE DBG: create button found=${createButton.evaluate().length} enabled=$enabled');
     await tester.tap(createButton);
     await _wait(tester, seconds: 4);
     // ignore: avoid_print
-    print('SMOKE DBG: after tap, create page present=${createPage.evaluate().isNotEmpty}');
+    print(
+        'SMOKE DBG: after tap, create page present=${createPage.evaluate().isNotEmpty}');
     if (createPage.evaluate().isNotEmpty) {
       final errors = find
           .byType(Text)
@@ -129,22 +142,28 @@ void main() {
     // ignore: avoid_print
     print('SMOKE OK: created work item id=$createdId name=$title');
 
-    // 一覧に作成した Work Item が表示される（プロジェクトから開き直して再読込）
-    await tester.pageBack();
+    // 作成結果は取得済み一覧へ反映される。
     await _wait(tester, seconds: 2);
-    await tester.tap(find.text(projectName));
-    await _wait(tester, seconds: 3);
-    expect(find.text(title), findsOneWidget, reason: '一覧に作成した Work Item が表示される');
+    await tester.scrollUntilVisible(find.text(title), 450,
+        scrollable: find
+            .descendant(
+                of: find.byType(ListView), matching: find.byType(Scrollable))
+            .first,
+        maxScrolls: 100);
+    await _wait(tester);
+    expect(find.text(title), findsOneWidget,
+        reason: '一覧に作成した Work Item が表示される');
 
     // --- コメント投稿 ---
     await tester.tap(find.text(title));
     await _wait(tester, seconds: 3);
-    final commentBody = 'smoke-comment-${DateTime.now().millisecondsSinceEpoch}';
+    final commentBody =
+        'smoke-comment-${DateTime.now().millisecondsSinceEpoch}';
     await tester.enterText(
-      find.descendant(of: find.byType(CommentSection), matching: find.byType(TextField)),
+      find.byKey(const ValueKey('comment-input')),
       commentBody,
     );
-    await tester.tap(find.byIcon(Icons.send));
+    await tester.tap(find.byKey(const ValueKey('send-comment')));
     await _wait(tester, seconds: 4);
 
     final commentsRes = await dio.get<Map<String, dynamic>>(

@@ -3,6 +3,7 @@ import 'package:plane_mobile/domain/entities/project.dart';
 class ProjectModel {
   final String id;
   final String name;
+  final String? identifier;
   final String? description;
   final String? coverImage;
   final String network;
@@ -20,6 +21,7 @@ class ProjectModel {
   const ProjectModel({
     required this.id,
     required this.name,
+    this.identifier,
     this.description,
     this.coverImage,
     required this.network,
@@ -39,6 +41,7 @@ class ProjectModel {
     return ProjectModel(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
+      identifier: json['identifier'] as String?,
       description: json['description'] as String?,
       coverImage: json['cover_image'] as String?,
       network: json['network']?.toString() ?? '',
@@ -62,6 +65,7 @@ class ProjectModel {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
+        'identifier': identifier,
         'description': description,
         'cover_image': coverImage,
         'network': network,
@@ -80,6 +84,7 @@ class ProjectModel {
   Project toEntity() => Project(
         id: id,
         name: name,
+        identifier: identifier,
         description: description,
         coverImage: coverImage,
         network: network,

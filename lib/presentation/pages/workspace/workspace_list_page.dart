@@ -25,7 +25,7 @@ class WorkspaceListView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Workspaces'),
+        title: const Text('Home'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -36,8 +36,10 @@ class WorkspaceListView extends StatelessWidget {
       body: BlocBuilder<WorkspaceBloc, WorkspaceState>(
         builder: (context, state) {
           return switch (state) {
-            WorkspaceLoading() => const Center(child: CircularProgressIndicator()),
-            WorkspacesLoaded(:final workspaces) => _buildList(context, workspaces),
+            WorkspaceLoading() =>
+              const Center(child: CircularProgressIndicator()),
+            WorkspacesLoaded(:final workspaces) =>
+              _buildList(context, workspaces),
             WorkspaceError(:final message) => _buildError(context, message),
             _ => const SizedBox.shrink(),
           };

@@ -1,321 +1,304 @@
 import 'package:flutter/material.dart';
 import 'package:plane_mobile/domain/entities/work_item.dart';
+import 'status_badge.dart';
+import 'priority_badge.dart';
 
 class WorkItemProperties extends StatelessWidget {
   final WorkItem workItem;
   final List<WorkItemState> states;
   final List<WorkItemLabel> labels;
   final List<WorkItemMember> members;
-  final void Function(String? value)? onStateChanged;
-  final void Function(String? value)? onPriorityChanged;
-  final void Function(List<String> ids)? onLabelsChanged;
-  final void Function(List<String> ids)? onAssigneesChanged;
-  final void Function(String? value)? onStartDateChanged;
-  final void Function(String? value)? onTargetDateChanged;
-
-  const WorkItemProperties({
-    super.key,
-    required this.workItem,
-    required this.states,
-    required this.labels,
-    required this.members,
-    this.onStateChanged,
-    this.onPriorityChanged,
-    this.onLabelsChanged,
-    this.onAssigneesChanged,
-    this.onStartDateChanged,
-    this.onTargetDateChanged,
-  });
+  final ValueChanged<String?>? onStateChanged,
+      onPriorityChanged,
+      onStartDateChanged,
+      onTargetDateChanged;
+  final ValueChanged<List<String>>? onLabelsChanged, onAssigneesChanged;
+  final String? statesError, labelsError, membersError;
+  final VoidCallback? onRetryStates, onRetryLabels, onRetryMembers;
+  const WorkItemProperties(
+      {super.key,
+      required this.workItem,
+      required this.states,
+      required this.labels,
+      required this.members,
+      this.onStateChanged,
+      this.onPriorityChanged,
+      this.onLabelsChanged,
+      this.onAssigneesChanged,
+      this.onStartDateChanged,
+      this.onTargetDateChanged,
+      this.statesError,
+      this.labelsError,
+      this.membersError,
+      this.onRetryStates,
+      this.onRetryLabels,
+      this.onRetryMembers});
 
   @override
   Widget build(BuildContext context) {
+    final memberIds = workItem.assigneesIds ??
+        workItem.assignees?.map((m) => m.id).toList() ??
+        [];
+    final labelIds =
+        workItem.labelIds ?? workItem.labels?.map((l) => l.id).toList() ?? [];
+    final assigneeNames = memberIds
+        .map((id) =>
+            members.where((m) => m.id == id).firstOrNull?.fullName ??
+            workItem.assignees
+                ?.where((m) => m.id == id)
+                .firstOrNull
+                ?.fullName ??
+            id)
+        .join(', ');
+    final labelNames = labelIds
+        .map((id) => labels.where((l) => l.id == id).firstOrNull?.name ?? id)
+        .join(', ');
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Properties',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 12),
-          _buildStateSelector(context),
-          const SizedBox(height: 12),
-          _buildPrioritySelector(context),
-          const SizedBox(height: 12),
-          _buildAssigneeSelector(context),
-          const SizedBox(height: 12),
-          _buildLabelSelector(context),
-          const SizedBox(height: 12),
-          _buildDateField(context, 'Start Date', workItem.startDate, onStartDateChanged),
-          const SizedBox(height: 12),
-          _buildDateField(context, 'Target Date', workItem.targetDate, onTargetDateChanged),
-        ],
-      ),
-    );
+        padding: const EdgeInsets.all(16),
+        child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withAlpha(70),
+                borderRadius: BorderRadius.circular(16)),
+            child: Wrap(spacing: 8, runSpacing: 8, children: [
+              _chip(
+                  context,
+                  'Priority',
+                  Icons.indeterminate_check_box_outlined,
+                  workItem.displayPriority,
+                  onPriorityChanged == null
+                      ? null
+                      : () => _choose(
+                          context,
+                          'Priority',
+                          ['urgent', 'high', 'medium', 'low', 'none']
+                              .map((p) =>
+                                  (p, p[0].toUpperCase() + p.substring(1)))
+                              .toList(),
+                          [workItem.priority ?? 'none'],
+                          false,
+                          (ids) => onPriorityChanged!(ids.first)),
+                  leading: PriorityBadge(
+                      priority: workItem.priority, iconOnly: true)),
+              _chip(
+                  context,
+                  'State',
+                  Icons.adjust,
+                  workItem.stateDetail?.name ?? 'State',
+                  onStateChanged == null
+                      ? null
+                      : () => _choose(
+                          context,
+                          'State',
+                          states.map((s) => (s.id, s.name)).toList(),
+                          [
+                            if (workItem.stateDetail != null)
+                              workItem.stateDetail!.id
+                          ],
+                          false,
+                          (ids) => onStateChanged!(ids.first),
+                          error: statesError,
+                          retry: onRetryStates),
+                  leading: workItem.stateDetail == null
+                      ? null
+                      : StatusBadge(
+                          state: workItem.stateDetail!, iconOnly: true)),
+              _chip(
+                  context,
+                  'Assignees',
+                  Icons.person_outline,
+                  assigneeNames.isEmpty ? 'Assignees' : assigneeNames,
+                  onAssigneesChanged == null
+                      ? null
+                      : () => _choose(
+                          context,
+                          'Assignees',
+                          members.map((m) => (m.id, m.fullName)).toList(),
+                          memberIds,
+                          true,
+                          onAssigneesChanged!,
+                          error: membersError,
+                          retry: onRetryMembers)),
+              _chip(
+                  context,
+                  'Start date',
+                  Icons.event_available_outlined,
+                  workItem.startDate ?? 'Start date',
+                  onStartDateChanged == null
+                      ? null
+                      : () => _date(context, 'Start date', workItem.startDate,
+                          onStartDateChanged!)),
+              _chip(
+                  context,
+                  'Due date',
+                  Icons.event_outlined,
+                  workItem.targetDate ?? 'Due date',
+                  onTargetDateChanged == null
+                      ? null
+                      : () => _date(context, 'Due date', workItem.targetDate,
+                          onTargetDateChanged!)),
+              _chip(
+                  context,
+                  'Labels',
+                  Icons.sell_outlined,
+                  labelNames.isEmpty ? 'Labels' : labelNames,
+                  onLabelsChanged == null
+                      ? null
+                      : () => _choose(
+                          context,
+                          'Labels',
+                          labels.map((l) => (l.id, l.name)).toList(),
+                          labelIds,
+                          true,
+                          onLabelsChanged!,
+                          error: labelsError,
+                          retry: onRetryLabels)),
+            ])));
   }
 
-  Widget _buildStateSelector(BuildContext context) {
-    return _PropertyRow(
-      label: 'State',
-      child: DropdownButtonFormField<String>(
-        initialValue: workItem.stateDetail?.id,
-        decoration: const InputDecoration(
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        ),
-        items: states.map((state) {
-          return DropdownMenuItem(
-            value: state.id,
-            child: Text(state.name),
-          );
-        }).toList(),
-        onChanged: onStateChanged,
-      ),
-    );
-  }
-
-  Widget _buildPrioritySelector(BuildContext context) {
-    return _PropertyRow(
-      label: 'Priority',
-      child: DropdownButtonFormField<String>(
-        initialValue: workItem.priority ?? 'none',
-        decoration: const InputDecoration(
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        ),
-        items: const [
-          DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
-          DropdownMenuItem(value: 'high', child: Text('High')),
-          DropdownMenuItem(value: 'medium', child: Text('Medium')),
-          DropdownMenuItem(value: 'low', child: Text('Low')),
-          DropdownMenuItem(value: 'none', child: Text('None')),
-        ],
-        onChanged: onPriorityChanged,
-      ),
-    );
-  }
-
-  Widget _buildAssigneeSelector(BuildContext context) {
-    final assigneeIds = workItem.assigneesIds ?? [];
-    return _PropertyRow(
-      label: 'Assignees',
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: [
-          ...assigneeIds.map((id) {
-            final member = members.where((m) => m.id == id).firstOrNull;
-            return Chip(
-              label: Text(member?.fullName ?? id, style: const TextStyle(fontSize: 12)),
-              onDeleted: onAssigneesChanged != null
-                  ? () {
-                      onAssigneesChanged!(assigneeIds.where((a) => a != id).toList());
-                    }
-                  : null,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-            );
-          }),
-          ActionChip(
-            label: const Text('+ Add', style: TextStyle(fontSize: 12)),
-            onPressed: () => _showMemberPicker(context),
-            visualDensity: VisualDensity.compact,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showMemberPicker(BuildContext context) {
-    final assigneeIds = workItem.assigneesIds ?? [];
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Text('Select Assignees', style: Theme.of(context).textTheme.titleMedium),
-                        const Spacer(),
-                        FilledButton(
-                          onPressed: () {
-                            onAssigneesChanged?.call(assigneeIds);
-                            Navigator.pop(ctx);
-                          },
-                          child: const Text('Done'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ...members.map((member) => CheckboxListTile(
-                        value: assigneeIds.contains(member.id),
-                        title: Text(member.fullName),
-                        onChanged: (val) {
-                          setModalState(() {
-                            if (val == true) {
-                              assigneeIds.add(member.id);
-                            } else {
-                              assigneeIds.remove(member.id);
-                            }
-                          });
+  Widget _chip(BuildContext ctx, String name, IconData icon, String label,
+          VoidCallback? pressed, {Widget? leading}) =>
+      ConstrainedBox(
+          constraints:
+              BoxConstraints(maxWidth: MediaQuery.sizeOf(ctx).width - 64),
+          child: OutlinedButton(
+            key: ValueKey('property-$name'),
+            onPressed: pressed,
+            style: OutlinedButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.surface,
+                foregroundColor: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                side: BorderSide(
+                    color:
+                        Theme.of(ctx).colorScheme.outlineVariant.withAlpha(70)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9))),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              leading ?? Icon(icon, size: 18),
+              const SizedBox(width: 6),
+              Flexible(
+                  child:
+                      Text(label, maxLines: 2, overflow: TextOverflow.ellipsis))
+            ]),
+          ));
+  Future<void> _choose(
+      BuildContext ctx,
+      String title,
+      List<(String, String)> choices,
+      List<String> ids,
+      bool multiple,
+      ValueChanged<List<String>> changed,
+      {String? error,
+      VoidCallback? retry}) async {
+    if (error != null) {
+      await showDialog(
+          context: ctx,
+          builder: (c) => AlertDialog(
+                  title: Text('Could not load $title'),
+                  content: Text(error),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(c),
+                        child: const Text('Cancel')),
+                    TextButton(
+                        onPressed: () {
+                          Navigator.pop(c);
+                          retry?.call();
                         },
-                      )),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+                        child: const Text('Retry'))
+                  ]));
+      return;
+    }
+    final selected = {...ids};
+    String query = '';
+    final result = await showModalBottomSheet<List<String>>(
+        context: ctx,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (c) => StatefulBuilder(
+            builder: (c, update) => SafeArea(
+                child: SizedBox(
+                    height: MediaQuery.sizeOf(c).height * .72,
+                    child: Column(children: [
+                      Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: Text(title,
+                              style: Theme.of(c).textTheme.titleLarge)),
+                      Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: TextField(
+                              decoration: InputDecoration(
+                                  hintText: 'Search $title',
+                                  prefixIcon: const Icon(Icons.search)),
+                              onChanged: (s) =>
+                                  update(() => query = s.toLowerCase()))),
+                      Expanded(
+                          child: ListView(children: [
+                        for (final (id, name) in choices
+                            .where((x) => x.$2.toLowerCase().contains(query)))
+                          CheckboxListTile(
+                              title: Text(name),
+                              value: selected.contains(id),
+                              onChanged: (v) => update(() {
+                                    if (!multiple) selected.clear();
+                                    if (v == true)
+                                      selected.add(id);
+                                    else if (multiple) selected.remove(id);
+                                  }))
+                      ])),
+                      Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(children: [
+                            Expanded(
+                                child: OutlinedButton(
+                                    onPressed: () => Navigator.pop(c),
+                                    child: const Text('Cancel'))),
+                            const SizedBox(width: 12),
+                            Expanded(
+                                child: FilledButton(
+                                    onPressed: !multiple && selected.isEmpty
+                                        ? null
+                                        : () =>
+                                            Navigator.pop(c, selected.toList()),
+                                    child: const Text('Save')))
+                          ])),
+                    ])))));
+    if (result != null) changed(result);
   }
 
-  Widget _buildLabelSelector(BuildContext context) {
-    final labelIds = workItem.labelIds ?? [];
-    return _PropertyRow(
-      label: 'Labels',
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: [
-          ...labelIds.map((id) {
-            final label = labels.where((l) => l.id == id).firstOrNull;
-            return Chip(
-              label: Text(label?.name ?? id, style: const TextStyle(fontSize: 12)),
-              onDeleted: onLabelsChanged != null
-                  ? () {
-                      onLabelsChanged!(labelIds.where((l) => l != id).toList());
-                    }
-                  : null,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-            );
-          }),
-          ActionChip(
-            label: const Text('+ Add', style: TextStyle(fontSize: 12)),
-            onPressed: () => _showLabelPicker(context),
-            visualDensity: VisualDensity.compact,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLabelPicker(BuildContext context) {
-    final labelIds = List<String>.from(workItem.labelIds ?? []);
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Text('Select Labels', style: Theme.of(context).textTheme.titleMedium),
-                        const Spacer(),
-                        FilledButton(
-                          onPressed: () {
-                            onLabelsChanged?.call(labelIds);
-                            Navigator.pop(ctx);
-                          },
-                          child: const Text('Done'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ...labels.map((label) => CheckboxListTile(
-                        value: labelIds.contains(label.id),
-                        title: Text(label.name),
-                        onChanged: (val) {
-                          setModalState(() {
-                            if (val == true) {
-                              labelIds.add(label.id);
-                            } else {
-                              labelIds.remove(label.id);
-                            }
-                          });
-                        },
-                      )),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildDateField(BuildContext context, String label, String? value, ValueChanged<String?>? onChanged) {
-    return _PropertyRow(
-      label: label,
-      child: InkWell(
-        onTap: () async {
-          final picked = await showDatePicker(
-            context: context,
-            initialDate: value != null ? DateTime.tryParse(value) ?? DateTime.now() : DateTime.now(),
-            firstDate: DateTime(2020),
-            lastDate: DateTime(2030),
-          );
-          if (picked != null && onChanged != null) {
-            onChanged(picked.toIso8601String().split('T')[0]);
-          }
-        },
-        child: InputDecorator(
-          decoration: const InputDecoration(
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                value ?? 'Not set',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              Icon(Icons.calendar_today, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PropertyRow extends StatelessWidget {
-  final String label;
-  final Widget child;
-
-  const _PropertyRow({required this.label, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ),
-        Expanded(child: child),
-      ],
-    );
+  Future<void> _date(BuildContext ctx, String title, String? value,
+      ValueChanged<String?> changed) async {
+    final action = await showModalBottomSheet<String>(
+        context: ctx,
+        showDragHandle: true,
+        builder: (c) => SafeArea(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+              ListTile(
+                  title: Text('Set $title'),
+                  onTap: () => Navigator.pop(c, 'pick')),
+              if (value != null)
+                ListTile(
+                    title: const Text('Clear date'),
+                    onTap: () => Navigator.pop(c, 'clear')),
+              ListTile(
+                  title: const Text('Cancel'), onTap: () => Navigator.pop(c))
+            ])));
+    if (action == 'clear') {
+      changed(null);
+      return;
+    }
+    if (action != 'pick' || !ctx.mounted) return;
+    final initial = DateTime.tryParse(value ?? '') ?? DateTime.now();
+    final picked = await showDatePicker(
+        context: ctx,
+        initialDate: initial,
+        firstDate: DateTime(initial.year - 50),
+        lastDate: DateTime(initial.year + 50));
+    if (picked != null) changed(picked.toIso8601String().split('T').first);
   }
 }

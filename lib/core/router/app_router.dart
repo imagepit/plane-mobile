@@ -1,3 +1,5 @@
+import 'package:plane_mobile/presentation/widgets/navigation/mobile_shell.dart';
+import 'package:plane_mobile/presentation/pages/work_item/work_item_search_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plane_mobile/core/di/injection.dart';
 import 'package:plane_mobile/core/storage/local_storage.dart';
@@ -34,45 +36,44 @@ final GoRouter appRouter = GoRouter(
       path: '/settings',
       builder: (context, state) => const ServerConfigPage(),
     ),
-    GoRoute(
-      path: '/workspaces',
-      builder: (context, state) => const WorkspaceListPage(),
-    ),
-    GoRoute(
-      path: '/workspaces/:slug/projects',
-      builder: (context, state) {
-        final slug = state.pathParameters['slug']!;
-        return ProjectListPage(workspaceSlug: slug);
-      },
-    ),
-    GoRoute(
-      path: '/workspaces/:slug/projects/:projectId/items',
-      builder: (context, state) {
-        final slug = state.pathParameters['slug']!;
-        final projectId = state.pathParameters['projectId']!;
-        return WorkItemListPage(workspaceSlug: slug, projectId: projectId);
-      },
-    ),
-    GoRoute(
-      path: '/workspaces/:slug/projects/:projectId/items/new',
-      builder: (context, state) {
-        final slug = state.pathParameters['slug']!;
-        final projectId = state.pathParameters['projectId']!;
-        return CreateWorkItemPage(workspaceSlug: slug, projectId: projectId);
-      },
-    ),
-    GoRoute(
-      path: '/workspaces/:slug/projects/:projectId/items/:itemId',
-      builder: (context, state) {
-        final slug = state.pathParameters['slug']!;
-        final projectId = state.pathParameters['projectId']!;
-        final itemId = state.pathParameters['itemId']!;
-        return WorkItemDetailPage(
-          workspaceSlug: slug,
-          projectId: projectId,
-          itemId: itemId,
-        );
-      },
+    ShellRoute(
+      builder: (context, state, child) => MobileShell(
+          location: state.uri.path,
+          workspaceSlug: state.pathParameters['slug'],
+          projectId: state.pathParameters['projectId'],
+          child: child),
+      routes: [
+        GoRoute(
+            path: '/workspaces',
+            builder: (_, state) => const WorkspaceListPage()),
+        GoRoute(
+            path: '/workspaces/:slug/projects',
+            builder: (_, s) =>
+                ProjectListPage(workspaceSlug: s.pathParameters['slug']!)),
+        GoRoute(
+            path: '/workspaces/:slug/projects/:projectId/items',
+            builder: (_, s) => WorkItemListPage(
+                workspaceSlug: s.pathParameters['slug']!,
+                projectId: s.pathParameters['projectId']!),
+            routes: [
+              GoRoute(
+                  path: 'new',
+                  builder: (_, s) => CreateWorkItemPage(
+                      workspaceSlug: s.pathParameters['slug']!,
+                      projectId: s.pathParameters['projectId']!)),
+              GoRoute(
+                  path: 'search',
+                  builder: (_, s) => WorkItemSearchPage(
+                      workspaceSlug: s.pathParameters['slug']!,
+                      projectId: s.pathParameters['projectId']!)),
+              GoRoute(
+                  path: ':itemId',
+                  builder: (_, s) => WorkItemDetailPage(
+                      workspaceSlug: s.pathParameters['slug']!,
+                      projectId: s.pathParameters['projectId']!,
+                      itemId: s.pathParameters['itemId']!)),
+            ]),
+      ],
     ),
   ],
 );

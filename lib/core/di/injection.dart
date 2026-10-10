@@ -1,3 +1,4 @@
+import 'package:plane_mobile/domain/usecases/get_project.dart';
 import 'package:get_it/get_it.dart';
 import 'package:plane_mobile/core/network/dio_client.dart';
 import 'package:plane_mobile/core/storage/credential_store.dart';
@@ -92,6 +93,7 @@ Future<void> configureDependencies() async {
 
   sl.registerFactory<GetWorkspaces>(
       () => GetWorkspaces(sl<WorkspaceRepository>()));
+  sl.registerFactory<GetProject>(() => GetProject(sl<ProjectRepository>()));
   sl.registerFactory<GetProjects>(() => GetProjects(sl<ProjectRepository>()));
   sl.registerFactory<GetWorkItems>(
       () => GetWorkItems(sl<WorkItemRepository>()));

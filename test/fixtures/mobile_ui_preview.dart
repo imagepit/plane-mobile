@@ -1,3 +1,10 @@
+import 'package:plane_mobile/presentation/pages/work_item/work_item_search_page.dart';
+import 'package:plane_mobile/domain/entities/work_item_page.dart';
+import 'package:plane_mobile/domain/entities/comment_page.dart';
+import 'package:plane_mobile/domain/entities/project.dart';
+import 'package:plane_mobile/domain/repositories/project_repository.dart';
+import 'package:plane_mobile/domain/usecases/get_project.dart';
+import 'package:plane_mobile/presentation/widgets/navigation/mobile_shell.dart';
 import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -46,7 +53,7 @@ const previewItems = [
 ];
 
 // This entry point has no transport, credentials or device storage.
-class PreviewRepository implements WorkItemRepository {
+class PreviewRepository implements WorkItemRepository, ProjectRepository {
   List<WorkItem> items = [...previewItems];
   List<Comment> comments = [
     Comment(
@@ -56,9 +63,9 @@ class PreviewRepository implements WorkItemRepository {
         createdAt: DateTime(2026, 10, 9, 10))
   ];
   @override
-  Future<Either<Failure, List<WorkItem>>> getWorkItems(
-          String w, String p) async =>
-      Right(items);
+  Future<Either<Failure, WorkItemPage>> getWorkItems(String w, String p,
+          {String? cursor}) async =>
+      Right(WorkItemPage(items: items));
   @override
   Future<Either<Failure, WorkItem>> getWorkItem(
           String w, String p, String id) async =>
@@ -83,9 +90,10 @@ class PreviewRepository implements WorkItemRepository {
           String w, String p) async =>
       const Right([previewMember]);
   @override
-  Future<Either<Failure, List<Comment>>> getComments(
-          String w, String p, String id) async =>
-      Right(comments);
+  Future<Either<Failure, CommentPage>> getComments(
+          String w, String p, String id,
+          {String? cursor}) async =>
+      Right(CommentPage(items: comments));
   @override
   Future<Either<Failure, Comment>> addComment(
       String w, String p, String id, String html) async {
@@ -102,11 +110,30 @@ class PreviewRepository implements WorkItemRepository {
   Future<Either<Failure, WorkItem>> updateWorkItem(
       String w, String p, String id, Map<String, dynamic> data) async {
     final old = items.firstWhere((i) => i.id == id);
-    final item = old.copyWith(
-        name: data['name'] as String?,
-        priority: data['priority'] as String?,
-        startDate: data['start_date'] as String?,
-        targetDate: data['target_date'] as String?);
+    final candidates = (await getStates(w, p)).getOrElse(() => []);
+    final item = WorkItem(
+        id: old.id,
+        name: data['name'] as String? ?? old.name,
+        sequenceId: old.sequenceId,
+        description: old.description,
+        descriptionHtml: old.descriptionHtml,
+        stateDetail: data.containsKey('state')
+            ? candidates.firstWhere((x) => x.id == data['state'])
+            : old.stateDetail,
+        priority: data['priority'] as String? ?? old.priority,
+        startDate: data.containsKey('start_date')
+            ? data['start_date'] as String?
+            : old.startDate,
+        targetDate: data.containsKey('target_date')
+            ? data['target_date'] as String?
+            : old.targetDate,
+        assigneesIds: data['assignees'] as List<String>? ?? old.assigneesIds,
+        assignees: data.containsKey('assignees')
+            ? (data['assignees'] as List<String>).contains('person')
+                ? [previewMember]
+                : []
+            : old.assignees,
+        labelIds: data['labels'] as List<String>? ?? old.labelIds);
     items = items.map((i) => i.id == id ? item : i).toList();
     return Right(item);
   }
@@ -130,9 +157,29 @@ class PreviewRepository implements WorkItemRepository {
     items = items.where((i) => i.id != id).toList();
     return const Right(null);
   }
+
+  @override
+  Future<Either<Failure, Project>> getProject(String w, String p) async =>
+      const Right(Project(
+          id: 'preview',
+          name: 'Preview project',
+          network: '',
+          workspace: 'imagepit',
+          identifier: 'IMAGE'));
+  @override
+  Future<Either<Failure, List<Project>>> getProjects(String w) async =>
+      const Right([
+        Project(
+            id: 'preview',
+            name: 'Preview project',
+            network: '',
+            workspace: 'imagepit',
+            identifier: 'IMAGE')
+      ]);
 }
 
 void registerPreview(PreviewRepository repo) {
+  sl.registerSingleton<GetProject>(GetProject(repo));
   sl.registerSingleton<GetWorkItems>(GetWorkItems(repo));
   sl.registerSingleton<GetWorkItem>(GetWorkItem(repo));
   sl.registerSingleton<CreateWorkItem>(CreateWorkItem(repo));
@@ -156,29 +203,103 @@ void registerPreview(PreviewRepository repo) {
       addComment: sl()));
 }
 
-void main() {
-  registerPreview(PreviewRepository());
-  final router = GoRouter(
-      initialLocation: '/workspaces/imagepit/projects/preview/items',
-      routes: [
-        GoRoute(
-            path: '/workspaces/:slug/projects/:projectId/items',
-            builder: (_, s) => const WorkItemListPage(
-                workspaceSlug: 'imagepit', projectId: 'preview')),
-        GoRoute(
-            path: '/workspaces/:slug/projects/:projectId/items/new',
-            builder: (_, s) => const CreateWorkItemPage(
-                workspaceSlug: 'imagepit', projectId: 'preview')),
-        GoRoute(
-            path: '/workspaces/:slug/projects/:projectId/items/:itemId',
-            builder: (_, s) => WorkItemDetailPage(
-                workspaceSlug: 'imagepit',
-                projectId: 'preview',
-                itemId: s.pathParameters['itemId']!)),
-      ]);
-  runApp(MaterialApp.router(
+GoRouter createPreviewRouter(
+        {String initialLocation =
+            '/workspaces/imagepit/projects/preview/items'}) =>
+    GoRouter(initialLocation: initialLocation, routes: [
+      ShellRoute(
+          builder: (_, s, child) => MobileShell(
+              location: s.uri.path,
+              workspaceSlug: s.pathParameters['slug'],
+              projectId: s.pathParameters['projectId'],
+              child: child),
+          routes: [
+            GoRoute(
+                path: '/workspaces',
+                builder: (c, s) => Scaffold(
+                    appBar: AppBar(title: const Text('Home')),
+                    body: ListTile(
+                        title: const Text('imagepit'),
+                        onTap: () => c.go('/workspaces/imagepit/projects')))),
+            GoRoute(
+                path: '/workspaces/:slug/projects',
+                builder: (c, s) => Scaffold(
+                    appBar: AppBar(title: const Text('Projects')),
+                    body: ListTile(
+                        title: const Text('Preview project'),
+                        onTap: () {
+                          MobileShell.maybeOf(c)?.selectProject(
+                              'imagepit', 'preview',
+                              identifier: 'IMAGE', name: 'Preview project');
+                          c.go('/workspaces/imagepit/projects/preview/items');
+                        }))),
+            GoRoute(
+                path: '/workspaces/:slug/projects/:projectId/items',
+                builder: (_, s) => const WorkItemListPage(
+                    workspaceSlug: 'imagepit', projectId: 'preview'),
+                routes: [
+                  GoRoute(
+                      path: 'new',
+                      builder: (_, s) => const CreateWorkItemPage(
+                          workspaceSlug: 'imagepit', projectId: 'preview')),
+                  GoRoute(
+                      path: 'search',
+                      builder: (_, s) => const WorkItemSearchPage(
+                          workspaceSlug: 'imagepit', projectId: 'preview')),
+                  GoRoute(
+                      path: ':itemId',
+                      builder: (_, s) => WorkItemDetailPage(
+                          workspaceSlug: 'imagepit',
+                          projectId: 'preview',
+                          itemId: s.pathParameters['itemId']!)),
+                ]),
+          ]),
+    ]);
+
+Widget previewApp(GoRouter router, {bool dark = false, double scale = 1}) =>
+    MaterialApp.router(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      routerConfig: router));
+      themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+      routerConfig: router,
+      builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!),
+    );
+void main() {
+  final params = Uri.base.queryParameters;
+  final repo = PreviewRepository();
+  if (params['complex'] == '1') {
+    repo.items = [
+      repo.items.first.copyWith(
+          name: '長い日本語の作業項目名・担当者が多い場合でも属性とコメントへ迷わず到達できるか確認する',
+          descriptionHtml: '<p>長い本文の表示確認です。</p>' * 8 +
+              '<pre><code class="language-file-tree">.\n├── ++ 新規.dart\n└── ** 修正.dart</code></pre>' +
+              '<pre><code class="language-mermaid">graph TD; A--&gt;B;</code></pre>',
+          assignees: [
+            previewMember,
+            const WorkItemMember(id: 'two', displayName: '日本語の担当者'),
+            const WorkItemMember(id: 'three', displayName: '追加担当者')
+          ],
+          assigneesIds: [
+            'person',
+            'two',
+            'three'
+          ],
+          labelIds: [
+            'design'
+          ]),
+      repo.items.last
+    ];
+  }
+  registerPreview(repo);
+  runApp(previewApp(createPreviewRouter(),
+      dark: params['theme'] == 'dark' ||
+          const String.fromEnvironment('PREVIEW_THEME') == 'dark',
+      scale: double.tryParse(params['scale'] ??
+              const String.fromEnvironment('PREVIEW_SCALE',
+                  defaultValue: '1')) ??
+          1));
 }
