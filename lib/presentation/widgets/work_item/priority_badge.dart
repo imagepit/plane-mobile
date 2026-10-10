@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 class PriorityBadge extends StatelessWidget {
   final String? priority;
+  final bool iconOnly;
 
-  const PriorityBadge({super.key, this.priority});
+  const PriorityBadge({super.key, this.priority, this.iconOnly = false});
 
   Color _getColor(BuildContext context) {
     switch (priority?.toLowerCase()) {
@@ -33,9 +34,9 @@ class PriorityBadge extends StatelessWidget {
       case 'low':
         return Icons.keyboard_arrow_down;
       case 'none':
-        return Icons.trip_origin;
+        return Icons.indeterminate_check_box_outlined;
       default:
-        return Icons.trip_origin;
+        return Icons.indeterminate_check_box_outlined;
     }
   }
 
@@ -59,6 +60,9 @@ class PriorityBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _getColor(context);
+    if (iconOnly)
+      return Tooltip(
+          message: _label, child: Icon(_getIcon(), size: 22, color: color));
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

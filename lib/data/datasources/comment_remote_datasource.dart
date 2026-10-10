@@ -1,3 +1,5 @@
+import 'package:plane_mobile/domain/entities/work_item_page.dart';
+import 'work_item_remote_datasource.dart';
 import 'package:plane_mobile/core/network/dio_client.dart';
 import 'package:plane_mobile/data/models/comment_model.dart';
 
@@ -10,21 +12,14 @@ class CommentRemoteDataSource {
   /// （`results` / `next_cursor` / `next_page_results` ほか）で返る。
   /// `?expand=actor` を付けると `actor` が ID の代わりにオブジェクトで返り、
   /// 投稿者名を表示できる（2026-09-27 実測）。
-  Future<List<CommentModel>> getComments(
-    String workspaceSlug,
-    String projectId,
-    String itemId,
-  ) async {
+  Future<CursorPage<CommentModel>> getComments(
+      String workspaceSlug, String projectId, String itemId,
+      {String? cursor}) async {
     final response = await _dioClient.get<Map<String, dynamic>>(
       '/api/v1/workspaces/$workspaceSlug/projects/$projectId/work-items/$itemId/comments/?expand=actor',
+      queryParameters: {if (cursor != null) 'cursor': cursor},
     );
-    final body = response.data;
-    final data = body == null
-        ? const <dynamic>[]
-        : (body['results'] as List<dynamic>? ?? const <dynamic>[]);
-    return data
-        .map((json) => CommentModel.fromJson(json as Map<String, dynamic>))
-        .toList();
+    return decodeCursorPage(response.data, CommentModel.fromJson);
   }
 
   Future<CommentModel> addComment(

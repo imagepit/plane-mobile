@@ -1,285 +1,381 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:plane_mobile/presentation/widgets/preview/code_block_preview.dart';
+import 'package:go_router/go_router.dart';
 import 'package:plane_mobile/core/di/injection.dart';
-import 'package:plane_mobile/domain/entities/work_item.dart' as entities;
-import 'package:plane_mobile/domain/usecases/get_work_items.dart';
-import 'package:plane_mobile/domain/usecases/get_work_item.dart';
-import 'package:plane_mobile/domain/usecases/create_work_item.dart';
-import 'package:plane_mobile/domain/usecases/update_work_item.dart';
-import 'package:plane_mobile/domain/usecases/delete_work_item.dart';
-import 'package:plane_mobile/domain/usecases/get_states.dart';
-import 'package:plane_mobile/domain/usecases/get_labels.dart';
-import 'package:plane_mobile/domain/usecases/get_members.dart';
-import 'package:plane_mobile/domain/usecases/get_comments.dart';
-import 'package:plane_mobile/domain/usecases/add_comment.dart';
 import 'package:plane_mobile/presentation/blocs/work_item/work_item_bloc.dart';
+import 'package:plane_mobile/presentation/widgets/navigation/mobile_shell.dart';
+import 'package:plane_mobile/presentation/widgets/preview/code_block_preview.dart';
 import 'package:plane_mobile/presentation/widgets/work_item/work_item_header.dart';
 import 'package:plane_mobile/presentation/widgets/work_item/work_item_properties.dart';
 import 'package:plane_mobile/presentation/widgets/work_item/comment_section.dart';
 
-class WorkItemDetailPage extends StatelessWidget {
-  final String workspaceSlug;
-  final String projectId;
-  final String itemId;
-
-  const WorkItemDetailPage({
-    super.key,
-    required this.workspaceSlug,
-    required this.projectId,
-    required this.itemId,
-  });
-
+class WorkItemDetailPage extends StatefulWidget {
+  final String workspaceSlug, projectId, itemId;
+  const WorkItemDetailPage(
+      {super.key,
+      required this.workspaceSlug,
+      required this.projectId,
+      required this.itemId});
   @override
-  Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => WorkItemBloc(
-        getWorkItems: sl<GetWorkItems>(),
-        getWorkItem: sl<GetWorkItem>(),
-        createWorkItem: sl<CreateWorkItem>(),
-        updateWorkItem: sl<UpdateWorkItem>(),
-        deleteWorkItem: sl<DeleteWorkItem>(),
-        getStates: sl<GetStates>(),
-        getLabels: sl<GetLabels>(),
-        getMembers: sl<GetMembers>(),
-        getComments: sl<GetComments>(),
-        addComment: sl<AddComment>(),
-      )..add(LoadWorkItemDetail(
-          workspaceSlug: workspaceSlug,
-          projectId: projectId,
-          itemId: itemId,
-        )),
-      child: WorkItemDetailView(
-        workspaceSlug: workspaceSlug,
-        projectId: projectId,
-        itemId: itemId,
-      ),
-    );
+  State<WorkItemDetailPage> createState() => _WorkItemDetailPageState();
+}
+
+class _WorkItemDetailPageState extends State<WorkItemDetailPage> {
+  WorkItemBloc? _bloc;
+  bool _owns = false;
+  String? _loaded;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final shared = MobileShell.maybeOf(context)?.session?.bloc;
+    if (_bloc == null || (shared != null && shared != _bloc)) {
+      if (_owns) _bloc?.close();
+      _bloc = shared ?? sl<WorkItemBloc>();
+      _owns = shared == null;
+      _loaded = null;
+    }
   }
-}
-
-class WorkItemDetailView extends StatefulWidget {
-  final String workspaceSlug;
-  final String projectId;
-  final String itemId;
-
-  const WorkItemDetailView({
-    super.key,
-    required this.workspaceSlug,
-    required this.projectId,
-    required this.itemId,
-  });
-
-  @override
-  State<WorkItemDetailView> createState() => _WorkItemDetailViewState();
-}
-
-class _WorkItemDetailViewState extends State<WorkItemDetailView> {
-  bool _isEditing = false;
-  final _titleController = TextEditingController();
 
   @override
   void dispose() {
-    _titleController.dispose();
+    if (_owns) _bloc?.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Work Item'),
-        actions: [
-          IconButton(
-            icon: Icon(_isEditing ? Icons.save : Icons.edit),
-            onPressed: () => _toggleEdit(context),
-            tooltip: _isEditing ? 'Save' : 'Edit',
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'delete') {
-                _confirmDelete(context);
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'delete', child: Text('Delete')),
-            ],
-          ),
-        ],
-      ),
-      body: BlocConsumer<WorkItemBloc, WorkItemState>(
-        listener: (context, state) {
-          if (state is WorkItemDeleted) {
-            Navigator.of(context).pop();
-          }
-          if (state is WorkItemUpdated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Work item updated')),
-            );
-            setState(() => _isEditing = false);
-          }
-          if (state is WorkItemError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
-          }
-        },
-        builder: (context, state) {
-          if (state is WorkItemLoading || state is WorkItemActionLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state is WorkItemDetail) {
-            return _buildContent(context, state.workItem, state.states,
-                state.labels, state.members, state.comments, state is WorkItemActionLoading);
-          }
-          if (state is WorkItemError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(state.message, style: Theme.of(context).textTheme.bodyLarge),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: () => context.read<WorkItemBloc>().add(LoadWorkItemDetail(
-                          workspaceSlug: widget.workspaceSlug,
-                          projectId: widget.projectId,
-                          itemId: widget.itemId,
-                        )),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
-          return const SizedBox.shrink();
-        },
-      ),
-    );
+    final key = '${widget.workspaceSlug}/${widget.projectId}/${widget.itemId}';
+    if (_loaded != key) {
+      _loaded = key;
+      _bloc!.add(LoadWorkItemDetail(
+          workspaceSlug: widget.workspaceSlug,
+          projectId: widget.projectId,
+          itemId: widget.itemId));
+    }
+    return BlocProvider.value(
+        value: _bloc!,
+        child: WorkItemDetailView(
+            workspaceSlug: widget.workspaceSlug,
+            projectId: widget.projectId,
+            itemId: widget.itemId));
+  }
+}
+
+class WorkItemDetailView extends StatefulWidget {
+  final String workspaceSlug, projectId, itemId;
+  const WorkItemDetailView(
+      {super.key,
+      required this.workspaceSlug,
+      required this.projectId,
+      required this.itemId});
+  @override
+  State<WorkItemDetailView> createState() => _WorkItemDetailViewState();
+}
+
+class _WorkItemDetailViewState extends State<WorkItemDetailView> {
+  final _title = TextEditingController();
+  bool _editing = false, _saving = false;
+  Map<String, dynamic>? _failedField;
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
   }
 
-  Widget _buildContent(
-    BuildContext context,
-    entities.WorkItem workItem,
-    List<entities.WorkItemState> states,
-    List<entities.WorkItemLabel> labels,
-    List<entities.WorkItemMember> members,
-    List<entities.Comment> comments,
-    bool isLoading,
-  ) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          WorkItemHeader(workItem: workItem),
-          const Divider(height: 1),
-          if (_isEditing)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _titleController..text = workItem.name,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
-                ),
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                workItem.name,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-          if (workItem.description != null && workItem.description!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: RichHtml(
-                html: workItem.descriptionHtml ?? workItem.description!,
-                textStyle: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-          const Divider(height: 1),
-          WorkItemProperties(
-            workItem: workItem,
-            states: states,
-            labels: labels,
-            members: members,
-            onStateChanged: _isEditing ? (val) => _updateField(context, {'state': val}) : null,
-            onPriorityChanged: _isEditing ? (val) => _updateField(context, {'priority': val}) : null,
-            onLabelsChanged: _isEditing ? (val) => _updateField(context, {'label_ids': val}) : null,
-            onAssigneesChanged: _isEditing ? (val) => _updateField(context, {'assignees_ids': val}) : null,
-            onStartDateChanged: _isEditing ? (val) => _updateField(context, {'start_date': val}) : null,
-            onTargetDateChanged: _isEditing ? (val) => _updateField(context, {'target_date': val}) : null,
-          ),
-          const Divider(height: 1),
-          CommentSection(
-            comments: comments,
-            isLoading: isLoading,
-            onAddComment: (commentHtml) {
-              context.read<WorkItemBloc>().add(AddCommentEvent(
-                    workspaceSlug: widget.workspaceSlug,
-                    projectId: widget.projectId,
-                    itemId: widget.itemId,
-                    commentHtml: commentHtml,
-                  ));
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _toggleEdit(BuildContext context) {
-    setState(() {
-      _isEditing = !_isEditing;
-    });
-    if (!_isEditing && _titleController.text.isNotEmpty) {
-      final state = context.read<WorkItemBloc>().state;
-      if (state is WorkItemDetail && _titleController.text != state.workItem.name) {
-        context.read<WorkItemBloc>().add(UpdateWorkItemEvent(
+  WorkItemBloc get bloc => context.read<WorkItemBloc>();
+  LoadWorkItemDetail get reload => LoadWorkItemDetail(
+      workspaceSlug: widget.workspaceSlug,
+      projectId: widget.projectId,
+      itemId: widget.itemId);
+  LoadComments comments({bool append = false, bool allPages = false}) =>
+      LoadComments(
           workspaceSlug: widget.workspaceSlug,
           projectId: widget.projectId,
           itemId: widget.itemId,
-          data: {'name': _titleController.text},
-        ));
-      }
-    }
+          append: append,
+          allPages: allPages);
+  void _back() {
+    if (context.canPop())
+      context.pop();
+    else
+      context.go(
+          '/workspaces/${widget.workspaceSlug}/projects/${widget.projectId}/items');
   }
 
-  void _updateField(BuildContext context, Map<String, dynamic> data) {
-    context.read<WorkItemBloc>().add(UpdateWorkItemEvent(
-      workspaceSlug: widget.workspaceSlug,
-      projectId: widget.projectId,
-      itemId: widget.itemId,
-      data: data,
-    ));
+  Future<bool> _update(Map<String, dynamic> data) async {
+    if (_saving) return false;
+    setState(() => _saving = true);
+    final success = await bloc.execute(UpdateWorkItemEvent(
+        workspaceSlug: widget.workspaceSlug,
+        projectId: widget.projectId,
+        itemId: widget.itemId,
+        data: data));
+    if (!mounted) return success;
+    setState(() {
+      _saving = false;
+      _failedField = success ? null : Map.of(data);
+    });
+    return success;
   }
 
-  void _confirmDelete(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Work Item'),
-        content: const Text('Are you sure you want to delete this work item? This action cannot be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<WorkItemBloc>().add(DeleteWorkItemEvent(
-                workspaceSlug: widget.workspaceSlug,
-                projectId: widget.projectId,
-                itemId: widget.itemId,
-              ));
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+  Future<CommentCheckResult> _checkComments() async {
+    final itemId = widget.itemId;
+    final success = await bloc.execute(comments(allPages: true));
+    if (!mounted || !success || widget.itemId != itemId)
+      return CommentCheckResult.failed;
+    final posted = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+                title: const Text('Check the reloaded comments'),
+                content: const Text(
+                    'Is your previous comment in the history? Confirm before retrying to avoid posting it twice.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(c, true),
+                      child: const Text('Already posted')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(c, false),
+                      child: const Text('Not posted'))
+                ]));
+    if (posted == null || !mounted || widget.itemId != itemId)
+      return CommentCheckResult.failed;
+    await bloc.execute(ResolveCommentUncertainty(itemId: itemId));
+    return posted ? CommentCheckResult.posted : CommentCheckResult.notPosted;
   }
+
+  @override
+  Widget build(BuildContext context) =>
+      BlocConsumer<WorkItemBloc, WorkItemState>(
+        listenWhen: (p, s) => p.deletedId != s.deletedId,
+        listener: (context, s) {
+          if (s.deletedId == widget.itemId) _back();
+        },
+        builder: (context, s) {
+          final item = s.workItem?.id == widget.itemId ? s.workItem : null;
+          final busy = s.busy || _saving;
+          return Scaffold(
+              appBar: AppBar(
+                  leading: IconButton(
+                      tooltip: 'Back to work items',
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: _back),
+                  actions: [
+                    PopupMenuButton<String>(
+                        enabled: !busy,
+                        onSelected: (v) async {
+                          if (v == 'edit' && item != null)
+                            setState(() {
+                              _title.text = item.name;
+                              _editing = true;
+                            });
+                          if (v == 'delete') {
+                            final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (c) => AlertDialog(
+                                        title: const Text('Delete Work Item'),
+                                        content: const Text(
+                                            'This action cannot be undone.'),
+                                        actions: [
+                                          TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(c, false),
+                                              child: const Text('Cancel')),
+                                          FilledButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(c, true),
+                                              child: const Text('Delete'))
+                                        ]));
+                            if (confirmed == true && mounted)
+                              bloc.add(DeleteWorkItemEvent(
+                                  workspaceSlug: widget.workspaceSlug,
+                                  projectId: widget.projectId,
+                                  itemId: widget.itemId));
+                          }
+                        },
+                        itemBuilder: (_) => [
+                              const PopupMenuItem(
+                                  value: 'edit', child: Text('Edit title')),
+                              const PopupMenuItem(
+                                  value: 'delete', child: Text('Delete'))
+                            ])
+                  ]),
+              body: item == null
+                  ? Center(
+                      child: s.detailLoading
+                          ? const CircularProgressIndicator()
+                          : Column(mainAxisSize: MainAxisSize.min, children: [
+                              Text(s.error ?? 'Could not load this work item'),
+                              TextButton(
+                                  onPressed: () => bloc.add(reload),
+                                  child: const Text('Retry'))
+                            ]))
+                  : CommentSection(
+                      itemId: widget.itemId,
+                      drafts: MobileShell.maybeOf(context)?.session?.drafts,
+                      pendingDrafts: MobileShell.maybeOf(context)
+                          ?.session
+                          ?.pendingCommentDrafts,
+                      postedDrafts:
+                          MobileShell.maybeOf(context)?.session?.postedDrafts,
+                      comments: s.comments,
+                      isLoading: s.commentsLoading,
+                      hasNext: s.commentsHasNext,
+                      error: s.commentsError,
+                      uncertain: s.commentsUncertain,
+                      onLoadMore: () => bloc.add(comments(append: true)),
+                      onReload: () => bloc.add(comments()),
+                      onCheckComments: _checkComments,
+                      onAddComment: (html) async {
+                        final success = await bloc.execute(AddCommentEvent(
+                            workspaceSlug: widget.workspaceSlug,
+                            projectId: widget.projectId,
+                            itemId: widget.itemId,
+                            commentHtml: html));
+                        return success
+                            ? CommentSendResult.sent
+                            : bloc.isCommentUncertain(widget.itemId)
+                                ? CommentSendResult.uncertain
+                                : CommentSendResult.failed;
+                      },
+                      body: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (busy || s.detailLoading)
+                              const LinearProgressIndicator(minHeight: 2),
+                            WorkItemHeader(
+                                workItem: item,
+                                identifier: MobileShell.maybeOf(context)
+                                    ?.session
+                                    ?.identifier),
+                            if (_editing)
+                              Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: Column(children: [
+                                    TextField(
+                                        key: const ValueKey('edit-title'),
+                                        controller: _title,
+                                        enabled: !busy,
+                                        maxLines: null,
+                                        decoration: const InputDecoration(
+                                            labelText: 'Title')),
+                                    Row(children: [
+                                      TextButton(
+                                          onPressed: busy
+                                              ? null
+                                              : () => setState(() {
+                                                    _editing = false;
+                                                    _failedField = null;
+                                                  }),
+                                          child: const Text('Cancel')),
+                                      FilledButton(
+                                          onPressed: busy
+                                              ? null
+                                              : () async {
+                                                  if (_title.text
+                                                      .trim()
+                                                      .isEmpty) return;
+                                                  final saved = await _update({
+                                                    'name': _title.text.trim()
+                                                  });
+                                                  if (saved && mounted)
+                                                    setState(
+                                                        () => _editing = false);
+                                                },
+                                          child: const Text('Save'))
+                                    ])
+                                  ]))
+                            else
+                              Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: Text(item.name,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall)),
+                            const SizedBox(height: 12),
+                            if ((item.descriptionHtml ?? item.description ?? '')
+                                .isNotEmpty)
+                              Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: RichHtml(
+                                      html: item.descriptionHtml ??
+                                          item.description!,
+                                      textStyle: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge)),
+                            const SizedBox(height: 24),
+                            if (s.error != null)
+                              Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(s.error!,
+                                            style: TextStyle(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .error)),
+                                        Row(children: [
+                                          TextButton(
+                                              onPressed: busy
+                                                  ? null
+                                                  : () => bloc.add(reload),
+                                              child: const Text('Reload')),
+                                          if (_failedField != null) ...[
+                                            TextButton(
+                                                onPressed: busy
+                                                    ? null
+                                                    : () =>
+                                                        _update(_failedField!),
+                                                child:
+                                                    const Text('Retry save')),
+                                            TextButton(
+                                                onPressed: () => setState(
+                                                    () => _failedField = null),
+                                                child: const Text(
+                                                    'Cancel pending change'))
+                                          ]
+                                        ])
+                                      ])),
+                            WorkItemProperties(
+                              workItem: item,
+                              states: s.states,
+                              labels: s.labels,
+                              members: s.members,
+                              statesError: s.statesError,
+                              labelsError: s.labelsError,
+                              membersError: s.membersError,
+                              onRetryStates: () => bloc.add(LoadStates(
+                                  workspaceSlug: widget.workspaceSlug,
+                                  projectId: widget.projectId)),
+                              onRetryLabels: () => bloc.add(LoadLabels(
+                                  workspaceSlug: widget.workspaceSlug,
+                                  projectId: widget.projectId)),
+                              onRetryMembers: () => bloc.add(LoadMembers(
+                                  workspaceSlug: widget.workspaceSlug,
+                                  projectId: widget.projectId)),
+                              onStateChanged:
+                                  busy ? null : (v) => _update({'state': v}),
+                              onPriorityChanged:
+                                  busy ? null : (v) => _update({'priority': v}),
+                              onLabelsChanged:
+                                  busy ? null : (v) => _update({'labels': v}),
+                              onAssigneesChanged: busy
+                                  ? null
+                                  : (v) => _update({'assignees': v}),
+                              onStartDateChanged: busy
+                                  ? null
+                                  : (v) => _update({'start_date': v}),
+                              onTargetDateChanged: busy
+                                  ? null
+                                  : (v) => _update({'target_date': v}),
+                            ),
+                          ]),
+                    ));
+        },
+      );
 }

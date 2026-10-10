@@ -2,232 +2,249 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plane_mobile/core/di/injection.dart';
-import 'package:plane_mobile/domain/usecases/get_work_items.dart';
-import 'package:plane_mobile/domain/usecases/get_work_item.dart';
-import 'package:plane_mobile/domain/usecases/create_work_item.dart';
-import 'package:plane_mobile/domain/usecases/update_work_item.dart';
-import 'package:plane_mobile/domain/usecases/delete_work_item.dart';
-import 'package:plane_mobile/domain/usecases/get_states.dart';
-import 'package:plane_mobile/domain/usecases/get_labels.dart';
-import 'package:plane_mobile/domain/usecases/get_members.dart';
-import 'package:plane_mobile/domain/usecases/get_comments.dart';
-import 'package:plane_mobile/domain/usecases/add_comment.dart';
+import 'package:plane_mobile/domain/entities/work_item.dart' as entities;
 import 'package:plane_mobile/presentation/blocs/work_item/work_item_bloc.dart';
+import 'package:plane_mobile/presentation/widgets/navigation/mobile_shell.dart';
+import 'package:plane_mobile/presentation/widgets/work_item/work_item_properties.dart';
 
 class CreateWorkItemPage extends StatefulWidget {
-  final String workspaceSlug;
-  final String projectId;
-
-  const CreateWorkItemPage({
-    super.key,
-    required this.workspaceSlug,
-    required this.projectId,
-  });
-
+  final String workspaceSlug, projectId;
+  const CreateWorkItemPage(
+      {super.key, required this.workspaceSlug, required this.projectId});
   @override
   State<CreateWorkItemPage> createState() => _CreateWorkItemPageState();
 }
 
 class _CreateWorkItemPageState extends State<CreateWorkItemPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  String? _selectedState;
-  String? _selectedPriority = 'none';
-  String? _startDate;
-  String? _targetDate;
+  final _form = GlobalKey<FormState>();
+  final _name = TextEditingController(), _description = TextEditingController();
+  WorkItemBloc? _bloc;
+  bool _owns = false, _sending = false, _checking = false;
+  String? _stateId, _startDate, _targetDate;
+  String _priority = 'none';
+  List<String> _labels = [], _members = [];
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_bloc != null) return;
+    final shared = MobileShell.maybeOf(context)?.session?.bloc;
+    _bloc = shared ?? sl<WorkItemBloc>();
+    _owns = shared == null;
+    final pending = _bloc!.state.pendingCreate;
+    if (pending != null) {
+      _name.text = pending['name'] as String? ?? '';
+      _description.text = pending['description'] as String? ?? '';
+      _priority = pending['priority'] as String? ?? 'none';
+      _stateId = pending['state'] as String?;
+      _startDate = pending['start_date'] as String?;
+      _targetDate = pending['target_date'] as String?;
+      _labels = List<String>.from(pending['labels'] as List? ?? []);
+      _members = List<String>.from(pending['assignees'] as List? ?? []);
+    }
+    _bloc!
+      ..add(LoadStates(
+          workspaceSlug: widget.workspaceSlug, projectId: widget.projectId))
+      ..add(LoadLabels(
+          workspaceSlug: widget.workspaceSlug, projectId: widget.projectId))
+      ..add(LoadMembers(
+          workspaceSlug: widget.workspaceSlug, projectId: widget.projectId));
+  }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
+    _name.dispose();
+    _description.dispose();
+    if (_owns) _bloc?.close();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => WorkItemBloc(
-        getWorkItems: sl<GetWorkItems>(),
-        getWorkItem: sl<GetWorkItem>(),
-        createWorkItem: sl<CreateWorkItem>(),
-        updateWorkItem: sl<UpdateWorkItem>(),
-        deleteWorkItem: sl<DeleteWorkItem>(),
-        getStates: sl<GetStates>(),
-        getLabels: sl<GetLabels>(),
-        getMembers: sl<GetMembers>(),
-        getComments: sl<GetComments>(),
-        addComment: sl<AddComment>(),
-      )..add(LoadStates(workspaceSlug: widget.workspaceSlug, projectId: widget.projectId))
-          ..add(LoadLabels(workspaceSlug: widget.workspaceSlug, projectId: widget.projectId))
-          ..add(LoadMembers(workspaceSlug: widget.workspaceSlug, projectId: widget.projectId)),
-      child: BlocConsumer<WorkItemBloc, WorkItemState>(
-        listener: (context, state) {
-          if (state is WorkItemCreated) {
-            context.pop();
-          }
-          if (state is WorkItemError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
-          }
-        },
-        builder: (context, state) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Create Work Item'),
-              actions: [
-                TextButton(
-                  onPressed: state is WorkItemActionLoading ? null : () => _submit(context),
-                  child: const Text('Create'),
-                ),
-              ],
-            ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Title *',
-                        hintText: 'Enter work item title',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Title is required';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: 'Description',
-                        hintText: 'Enter description (optional)',
-                        alignLabelWithHint: true,
-                      ),
-                      maxLines: 5,
-                      minLines: 3,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildStateDropdown(context, state),
-                    const SizedBox(height: 16),
-                    _buildPriorityDropdown(),
-                    const SizedBox(height: 16),
-                    _buildDateField(context, 'Start Date', _startDate, (val) {
-                      setState(() => _startDate = val);
-                    }),
-                    const SizedBox(height: 16),
-                    _buildDateField(context, 'Target Date', _targetDate, (val) {
-                      setState(() => _targetDate = val);
-                    }),
-                    const SizedBox(height: 32),
-                    if (state is WorkItemActionLoading)
-                      const Center(child: CircularProgressIndicator()),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
+  Future<void> _submit() async {
+    if (_sending ||
+        _bloc!.state.createUncertain ||
+        !_form.currentState!.validate()) return;
+    setState(() => _sending = true);
+    final success = await _bloc!.execute(CreateWorkItemEvent(
+        workspaceSlug: widget.workspaceSlug,
+        projectId: widget.projectId,
+        data: {
+          'name': _name.text.trim(),
+          'description': _description.text.trim(),
+          'priority': _priority,
+          if (_stateId != null) 'state': _stateId,
+          if (_startDate != null) 'start_date': _startDate,
+          if (_targetDate != null) 'target_date': _targetDate,
+          if (_labels.isNotEmpty) 'labels': _labels,
+          if (_members.isNotEmpty) 'assignees': _members
+        }));
+    if (!mounted) return;
+    setState(() => _sending = false);
+    if (success) context.pop();
   }
 
-  Widget _buildStateDropdown(BuildContext context, WorkItemState state) {
-    List<DropdownMenuItem<String>> items = const [];
-    if (state is StatesLoaded) {
-      items = state.states.map((s) => DropdownMenuItem(
-            value: s.id,
-            child: Text(s.name),
-          )).toList();
-    }
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedState,
-      decoration: const InputDecoration(
-        labelText: 'State',
-        isDense: true,
-      ),
-      items: items,
-      onChanged: (val) => setState(() => _selectedState = val),
-    );
-  }
-
-  Widget _buildPriorityDropdown() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedPriority,
-      decoration: const InputDecoration(
-        labelText: 'Priority',
-        isDense: true,
-      ),
-      items: const [
-        DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
-        DropdownMenuItem(value: 'high', child: Text('High')),
-        DropdownMenuItem(value: 'medium', child: Text('Medium')),
-        DropdownMenuItem(value: 'low', child: Text('Low')),
-        DropdownMenuItem(value: 'none', child: Text('None')),
-      ],
-      onChanged: (val) => setState(() => _selectedPriority = val),
-    );
-  }
-
-  Widget _buildDateField(BuildContext context, String label, String? value, ValueChanged<String?> onChanged) {
-    return InkWell(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: value != null ? DateTime.tryParse(value) ?? DateTime.now() : DateTime.now(),
-          firstDate: DateTime(2020),
-          lastDate: DateTime(2030),
-        );
-        if (picked != null) {
-          onChanged(picked.toIso8601String().split('T')[0]);
-        }
-      },
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          isDense: true,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(value ?? 'Not set'),
-            Icon(Icons.calendar_today, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _submit(BuildContext context) {
-    if (!_formKey.currentState!.validate()) return;
-
-    final data = <String, dynamic>{
-      'name': _nameController.text.trim(),
-      'description': _descriptionController.text.trim(),
-      'priority': _selectedPriority ?? 'none',
-    };
-
-    if (_selectedState != null) {
-      data['state'] = _selectedState;
-    }
-    if (_startDate != null) {
-      data['start_date'] = _startDate;
-    }
-    if (_targetDate != null) {
-      data['target_date'] = _targetDate;
-    }
-
-    context.read<WorkItemBloc>().add(CreateWorkItemEvent(
+  Future<void> _checkCreatedItems() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    var success = await _bloc!.execute(LoadWorkItems(
+        workspaceSlug: widget.workspaceSlug, projectId: widget.projectId));
+    while (success && _bloc!.state.hasNext) {
+      success = await _bloc!.execute(LoadWorkItems(
           workspaceSlug: widget.workspaceSlug,
           projectId: widget.projectId,
-          data: data,
-        ));
+          append: true));
+    }
+    if (!mounted) return;
+    setState(() => _checking = false);
+    if (!success) return;
+    final posted = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+                title: const Text('Check the reloaded work items'),
+                content: SizedBox(
+                    width: double.maxFinite,
+                    height: 250,
+                    child: ListView(children: [
+                      Text(
+                          'Was "${_bloc!.state.pendingCreate?['name'] ?? _name.text}" already created?'),
+                      for (final item in _bloc!.state.workItems)
+                        ListTile(
+                            title: Text(item.name),
+                            subtitle: Text(item.displayId)),
+                    ])),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(c, true),
+                      child: const Text('Already created')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(c, false),
+                      child: const Text('Not created'))
+                ]));
+    if (posted == null || !mounted) return;
+    await _bloc!.execute(ResolveCreateUncertainty());
+    if (posted && mounted) context.pop();
   }
+
+  @override
+  Widget build(BuildContext context) => BlocProvider.value(
+      value: _bloc!,
+      child: BlocBuilder<WorkItemBloc, WorkItemState>(builder: (context, s) {
+        final busy = s.busy || _sending || _checking;
+        return Scaffold(
+            appBar: AppBar(title: const Text('Create Work Item'), actions: [
+              TextButton(
+                  key: const ValueKey('save-new-work-item'),
+                  onPressed: busy || s.createUncertain ? null : _submit,
+                  child: const Text('Create'))
+            ]),
+            body: SingleChildScrollView(
+                child: Form(
+                    key: _form,
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (busy) const LinearProgressIndicator(minHeight: 2),
+                          Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: TextFormField(
+                                  key: const ValueKey('new-work-item-title'),
+                                  controller: _name,
+                                  enabled: !busy,
+                                  maxLines: null,
+                                  style:
+                                      Theme.of(context).textTheme.headlineSmall,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Title *',
+                                      hintText: 'Enter work item title'),
+                                  validator: (s) =>
+                                      s == null || s.trim().isEmpty
+                                          ? 'Title is required'
+                                          : null)),
+                          Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: TextFormField(
+                                  key: const ValueKey(
+                                      'new-work-item-description'),
+                                  controller: _description,
+                                  enabled: !busy,
+                                  minLines: 3,
+                                  maxLines: 8,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Description',
+                                      hintText:
+                                          'Enter description (optional)'))),
+                          const SizedBox(height: 24),
+                          WorkItemProperties(
+                              workItem: entities.WorkItem(
+                                  id: 'new',
+                                  name: '',
+                                  sequenceId: 0,
+                                  priority: _priority,
+                                  stateDetail: s.states
+                                      .where((x) => x.id == _stateId)
+                                      .firstOrNull,
+                                  startDate: _startDate,
+                                  targetDate: _targetDate,
+                                  labelIds: _labels,
+                                  assigneesIds: _members),
+                              states: s.states,
+                              labels: s.labels,
+                              members: s.members,
+                              statesError: s.statesError,
+                              labelsError: s.labelsError,
+                              membersError: s.membersError,
+                              onRetryStates: () => _bloc!.add(LoadStates(
+                                  workspaceSlug: widget.workspaceSlug,
+                                  projectId: widget.projectId)),
+                              onRetryLabels: () => _bloc!.add(LoadLabels(
+                                  workspaceSlug: widget.workspaceSlug,
+                                  projectId: widget.projectId)),
+                              onRetryMembers: () => _bloc!.add(LoadMembers(
+                                  workspaceSlug: widget.workspaceSlug,
+                                  projectId: widget.projectId)),
+                              onStateChanged: busy
+                                  ? null
+                                  : (v) => setState(() => _stateId = v),
+                              onPriorityChanged: busy
+                                  ? null
+                                  : (v) =>
+                                      setState(() => _priority = v ?? 'none'),
+                              onStartDateChanged: busy
+                                  ? null
+                                  : (v) => setState(() => _startDate = v),
+                              onTargetDateChanged: busy
+                                  ? null
+                                  : (v) => setState(() => _targetDate = v),
+                              onLabelsChanged: busy
+                                  ? null
+                                  : (v) => setState(() => _labels = v),
+                              onAssigneesChanged: busy
+                                  ? null
+                                  : (v) => setState(() => _members = v)),
+                          if (s.createUncertain)
+                            Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(children: [
+                                  const Text(
+                                      'Could not confirm creation. Your input is kept. Check work items before retrying.'),
+                                  TextButton(
+                                      onPressed:
+                                          busy ? null : _checkCreatedItems,
+                                      child: const Text(
+                                          'Reload and check work items')),
+                                ])),
+                          if (s.error != null)
+                            Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text(s.error!,
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error))),
+                          Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: OutlinedButton(
+                                  onPressed: busy ? null : () => context.pop(),
+                                  child: const Text('Cancel'))),
+                        ]))));
+      }));
 }

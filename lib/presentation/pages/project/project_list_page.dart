@@ -1,3 +1,4 @@
+import 'package:plane_mobile/presentation/widgets/navigation/mobile_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -31,6 +32,10 @@ class ProjectListView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Projects'),
+        leading: IconButton(
+            tooltip: 'Workspaces',
+            icon: const Icon(Icons.chevron_left),
+            onPressed: () => context.go('/workspaces')),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -41,7 +46,8 @@ class ProjectListView extends StatelessWidget {
       body: BlocBuilder<ProjectBloc, ProjectState>(
         builder: (context, state) {
           return switch (state) {
-            ProjectLoading() => const Center(child: CircularProgressIndicator()),
+            ProjectLoading() =>
+              const Center(child: CircularProgressIndicator()),
             ProjectsLoaded(:final projects) => _buildList(context, projects),
             ProjectError(:final message) => _buildError(context, message),
             _ => const SizedBox.shrink(),
@@ -67,7 +73,9 @@ class ProjectListView extends StatelessWidget {
     }
     return RefreshIndicator(
       onRefresh: () async {
-        context.read<ProjectBloc>().add(LoadProjects(workspaceSlug: workspaceSlug));
+        context
+            .read<ProjectBloc>()
+            .add(LoadProjects(workspaceSlug: workspaceSlug));
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -77,9 +85,13 @@ class ProjectListView extends StatelessWidget {
           return ProjectCard(
             project: project,
             workspaceSlug: workspaceSlug,
-            onTap: () => context.push(
-              '/workspaces/$workspaceSlug/projects/${project.id}/items',
-            ),
+            onTap: () {
+              MobileShell.maybeOf(context)?.selectProject(
+                  workspaceSlug, project.id,
+                  identifier: project.identifier, name: project.name);
+              context.go(
+                  '/workspaces/$workspaceSlug/projects/${project.id}/items');
+            },
           );
         },
       ),

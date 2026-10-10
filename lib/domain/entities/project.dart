@@ -1,6 +1,7 @@
 class Project {
   final String id;
   final String name;
+  final String? identifier;
   final String? description;
   final String? coverImage;
   final String network;
@@ -18,6 +19,7 @@ class Project {
   const Project({
     required this.id,
     required this.name,
+    this.identifier,
     this.description,
     this.coverImage,
     required this.network,
@@ -36,6 +38,7 @@ class Project {
   Project copyWith({
     String? id,
     String? name,
+    String? identifier,
     String? description,
     String? coverImage,
     String? network,
@@ -53,6 +56,7 @@ class Project {
     return Project(
       id: id ?? this.id,
       name: name ?? this.name,
+      identifier: identifier ?? this.identifier,
       description: description ?? this.description,
       coverImage: coverImage ?? this.coverImage,
       network: network ?? this.network,

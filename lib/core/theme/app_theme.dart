@@ -12,12 +12,12 @@ class AppTheme {
         colorScheme: app_colors.AppColorScheme.lightColorScheme,
         textTheme: AppTypography.light,
         brightness: Brightness.light,
-        scaffoldBackgroundColor: app_colors.AppColorScheme.lightBackground,
+        scaffoldBackgroundColor: app_colors.AppColorScheme.lightSurface,
         appBarTheme: AppBarTheme(
           backgroundColor: app_colors.AppColorScheme.lightSurface,
           foregroundColor: app_colors.AppColorScheme.lightOnSurface,
           elevation: 0,
-          scrolledUnderElevation: 1,
+          scrolledUnderElevation: 0,
           centerTitle: false,
           titleTextStyle: AppTypography.light.titleLarge?.copyWith(
             color: app_colors.AppColorScheme.lightOnSurface,
@@ -31,15 +31,16 @@ class AppTheme {
           color: app_colors.AppColorScheme.lightSurface,
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: app_colors.AppColorScheme.lightPrimary,
-          foregroundColor: app_colors.AppColorScheme.lightOnPrimary,
+          backgroundColor: app_colors.AppColorScheme.lightSurface,
+          foregroundColor: app_colors.AppColorScheme.lightOnSurface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(40),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: app_colors.AppColorScheme.lightSurfaceContainerHighest.withAlpha(50),
+          fillColor: app_colors.AppColorScheme.lightSurfaceContainerHighest
+              .withAlpha(50),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
@@ -92,7 +93,7 @@ class AppTheme {
           backgroundColor: app_colors.AppColorScheme.darkSurface,
           foregroundColor: app_colors.AppColorScheme.darkOnSurface,
           elevation: 0,
-          scrolledUnderElevation: 1,
+          scrolledUnderElevation: 0,
           centerTitle: false,
           titleTextStyle: AppTypography.dark.titleLarge?.copyWith(
             color: app_colors.AppColorScheme.darkOnSurface,
@@ -103,18 +104,20 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          color: app_colors.AppColorScheme.darkSurfaceContainerHighest.withAlpha(80),
+          color: app_colors.AppColorScheme.darkSurfaceContainerHighest
+              .withAlpha(80),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: app_colors.AppColorScheme.darkPrimary,
-          foregroundColor: app_colors.AppColorScheme.darkOnPrimary,
+          backgroundColor: app_colors.AppColorScheme.darkSurface,
+          foregroundColor: app_colors.AppColorScheme.darkOnSurface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(40),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: app_colors.AppColorScheme.darkSurfaceContainerHighest.withAlpha(50),
+          fillColor: app_colors.AppColorScheme.darkSurfaceContainerHighest
+              .withAlpha(50),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(

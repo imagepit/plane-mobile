@@ -1,3 +1,5 @@
+import 'package:plane_mobile/domain/entities/work_item_page.dart';
+import 'package:plane_mobile/domain/entities/comment_page.dart';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import 'package:plane_mobile/core/errors/exceptions.dart';
@@ -26,12 +28,13 @@ class WorkItemRepositoryImpl implements WorkItemRepository {
   );
 
   @override
-  Future<Either<Failure, List<WorkItem>>> getWorkItems(
-      String workspaceSlug, String projectId) async {
+  Future<Either<Failure, WorkItemPage>> getWorkItems(
+      String workspaceSlug, String projectId,
+      {String? cursor}) async {
     try {
-      final models =
-          await _workItemDataSource.getWorkItems(workspaceSlug, projectId);
-      return Right(models.map((m) => m.toEntity()).toList());
+      final models = await _workItemDataSource
+          .getWorkItems(workspaceSlug, projectId, cursor: cursor);
+      return Right(models.map((m) => m.toEntity()));
     } on UnauthorizedException catch (e) {
       return Left(UnauthorizedFailure(e.message));
     } on ServerException catch (e) {
@@ -119,8 +122,7 @@ class WorkItemRepositoryImpl implements WorkItemRepository {
   Future<Either<Failure, List<WorkItemState>>> getStates(
       String workspaceSlug, String projectId) async {
     try {
-      final models =
-          await _stateDataSource.getStates(workspaceSlug, projectId);
+      final models = await _stateDataSource.getStates(workspaceSlug, projectId);
       return Right(models.map((m) => m.toEntity()).toList());
     } on UnauthorizedException catch (e) {
       return Left(UnauthorizedFailure(e.message));
@@ -137,8 +139,7 @@ class WorkItemRepositoryImpl implements WorkItemRepository {
   Future<Either<Failure, List<WorkItemLabel>>> getLabels(
       String workspaceSlug, String projectId) async {
     try {
-      final models =
-          await _labelDataSource.getLabels(workspaceSlug, projectId);
+      final models = await _labelDataSource.getLabels(workspaceSlug, projectId);
       return Right(models.map((m) => m.toEntity()).toList());
     } on UnauthorizedException catch (e) {
       return Left(UnauthorizedFailure(e.message));
@@ -170,12 +171,13 @@ class WorkItemRepositoryImpl implements WorkItemRepository {
   }
 
   @override
-  Future<Either<Failure, List<Comment>>> getComments(
-      String workspaceSlug, String projectId, String itemId) async {
+  Future<Either<Failure, CommentPage>> getComments(
+      String workspaceSlug, String projectId, String itemId,
+      {String? cursor}) async {
     try {
-      final models = await _commentDataSource.getComments(
-          workspaceSlug, projectId, itemId);
-      return Right(models.map((m) => m.toEntity()).toList());
+      final models = await _commentDataSource
+          .getComments(workspaceSlug, projectId, itemId, cursor: cursor);
+      return Right(models.map((m) => m.toEntity()));
     } on UnauthorizedException catch (e) {
       return Left(UnauthorizedFailure(e.message));
     } on ServerException catch (e) {

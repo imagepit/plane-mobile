@@ -3,14 +3,16 @@ import 'package:plane_mobile/domain/entities/work_item.dart';
 
 class StatusBadge extends StatelessWidget {
   final WorkItemState state;
+  final bool iconOnly;
 
-  const StatusBadge({super.key, required this.state});
+  const StatusBadge({super.key, required this.state, this.iconOnly = false});
 
   Color _getColor(BuildContext context) {
     if (state.color != null && state.color!.isNotEmpty) {
       final hex = state.color!.replaceFirst('#', '');
       if (hex.length == 6) {
-        return Color(int.parse('FF$hex', radix: 16));
+        final value = int.tryParse('FF$hex', radix: 16);
+        if (value != null) return Color(value);
       }
     }
     switch (state.group?.toLowerCase()) {
@@ -18,8 +20,10 @@ class StatusBadge extends StatelessWidget {
         return Theme.of(context).colorScheme.outline;
       case 'todo':
         return Theme.of(context).colorScheme.tertiary;
+      case 'started':
       case 'in_progress':
         return Theme.of(context).colorScheme.primary;
+      case 'completed':
       case 'done':
         return Colors.green;
       case 'cancelled':
@@ -32,11 +36,13 @@ class StatusBadge extends StatelessWidget {
   IconData _getIcon() {
     switch (state.group?.toLowerCase()) {
       case 'backlog':
-        return Icons.inbox;
+        return Icons.adjust;
       case 'todo':
         return Icons.circle_outlined;
+      case 'started':
       case 'in_progress':
         return Icons.autorenew;
+      case 'completed':
       case 'done':
         return Icons.check_circle;
       case 'cancelled':
@@ -49,6 +55,9 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _getColor(context);
+    if (iconOnly)
+      return Tooltip(
+          message: state.name, child: Icon(_getIcon(), size: 22, color: color));
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

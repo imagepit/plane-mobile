@@ -1,3 +1,5 @@
+import 'package:plane_mobile/core/errors/exceptions.dart';
+import 'package:plane_mobile/domain/entities/work_item_page.dart';
 import 'package:plane_mobile/core/network/dio_client.dart';
 import 'package:plane_mobile/data/models/work_item_model.dart';
 
@@ -11,21 +13,15 @@ class WorkItemRemoteDataSource {
   static const String _expand = 'state,assignees,labels';
 
   /// `/api/v1` の一覧は `results` 付きページング形で返る。
-  Future<List<WorkItemModel>> getWorkItems(
-    String workspaceSlug,
-    String projectId,
-  ) async {
+  Future<CursorPage<WorkItemModel>> getWorkItems(
+      String workspaceSlug, String projectId,
+      {String? cursor}) async {
     final response = await _dioClient.get<Map<String, dynamic>>(
       '/api/v1/workspaces/$workspaceSlug/projects/$projectId/work-items/'
       '?expand=$_expand',
+      queryParameters: {if (cursor != null) 'cursor': cursor},
     );
-    final body = response.data;
-    final data = body == null
-        ? const <dynamic>[]
-        : (body['results'] as List<dynamic>? ?? const <dynamic>[]);
-    return data
-        .map((json) => WorkItemModel.fromJson(json as Map<String, dynamic>))
-        .toList();
+    return decodeCursorPage(response.data, WorkItemModel.fromJson);
   }
 
   Future<WorkItemModel> getWorkItem(
@@ -74,4 +70,42 @@ class WorkItemRemoteDataSource {
       '/api/v1/workspaces/$workspaceSlug/projects/$projectId/work-items/$itemId/',
     );
   }
+}
+
+CursorPage<T> decodeCursorPage<T>(
+    Map<String, dynamic>? body, T Function(Map<String, dynamic>) decode) {
+  if (body == null || body['results'] is! List)
+    throw ServerException('Invalid page response');
+  final hasNext = body['next_page_results'] == true;
+  final cursor = body['next_cursor']?.toString();
+  if (hasNext && (cursor == null || cursor.isEmpty))
+    throw ServerException('Missing next cursor');
+  try {
+    return CursorPage(
+        items: (body['results'] as List)
+            .map((x) => decode(Map<String, dynamic>.from(x as Map)))
+            .toList(),
+        nextCursor: hasNext ? cursor : null,
+        hasNext: hasNext);
+  } catch (_) {
+    throw ServerException('Invalid page item');
+  }
+}
+
+Future<List<T>> readAllCursorPages<T>(
+    Future<Map<String, dynamic>?> Function(String?) fetch,
+    T Function(Map<String, dynamic>) decode,
+    String Function(T) id) async {
+  final result = <String, T>{};
+  final seen = <String>{};
+  String? cursor;
+  do {
+    final page = decodeCursorPage(await fetch(cursor), decode);
+    for (final item in page.items) {
+      result[id(item)] = item;
+    }
+    if (!page.hasNext) return result.values.toList();
+    cursor = page.nextCursor!;
+    if (!seen.add(cursor)) throw ServerException('Repeated pagination cursor');
+  } while (true);
 }
