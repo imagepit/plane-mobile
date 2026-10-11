@@ -10,6 +10,7 @@
 
 - APIは既存の`/api/v1/.../work-items/{id}/`へのPATCHを利用する。変更した`name`と`description_html`だけを送る。未変更のSaveでは通信しない。タイトルだけを変えた場合、本文のHTMLを再保存しない。
 - 本文を変えていなければ元のHTMLをそのまま保持する。本文を変えた場合も、既存の属性と対応していないブロックを復元する。Mermaid・ツリーは`pre`/`code`の言語属性、改行、日本語、エンティティを保持する。編集画面ではコードを編集し、保存後は既存の図・ツリープレビューへ戻る。
+- Planeから返る本文が通常の`div`で包まれていても、その中の段落・見出し・リスト・コードを編集できる。保存してシートを開き直す操作を繰り返しても編集状態を保つ。入れ子の`div`と既存属性は保持し、数式などの独自`data-type`ブロックは従来どおり編集対象外として残す。
 - Save中は編集・閉じる操作と二重送信を止める。入力変換中はSaveと書式操作を止め、変換後のDOMを反映してから保存する。失敗時はタイトルと本文を残してエラーを表示し、明示的な再試行を受け付ける。
 - 編集を閉じるときは未保存変更があれば破棄を確認する。破棄は更新APIを呼ばない。外側のタップやシートのドラッグで下書きを消さない。
 - `visualViewport`とsafe areaを使って、HTML入力でFlutterのviewInsetが通知されない場合もキーボード上へツールバーを配置する。シート表示時のアニメーションでツールバーの位置が途中に残る問題も防ぐ。
@@ -29,5 +30,7 @@ Node試験は、書式・ブロック編集、未変更HTML、タイトルのみ
 確認画像: [編集画面](ui-evidence/work-item-editor-light.png)、[ブロック追加](ui-evidence/work-item-block-menu.png)、[ダークテーマとコード](ui-evidence/work-item-editor-dark-rich.png)。
 
 実際のreleaseビルドと本番と同じCSPを付けたローカル確認画面で、390px幅のタイトル・本文編集、書式と見出しの追加、Save後の表示を確認した。確認データは通信・認証情報を持たないダミーである。iPhone実機のホーム画面PWAと日本語キーボードの変換・候補選択・キーボード開閉は、マージ後の実機確認事項である。
+
+`div`対応の修正では、同梱エディタを使うダミー確認画面で保存応答の本文を`div`で包み、390px幅で編集・Save・開き直しを3回繰り返した。3回の追記が残り、次の編集画面にも本文・見出し・ツリーのコードが表示されることを確認した。[保存後の再編集画面](ui-evidence/work-item-editor-reopened.png)はその記録である。本番データへの更新やiPhone実機での試験は行っていない。
 
 根拠: [StarterKit](https://tiptap.dev/docs/editor/extensions/functionality/starterkit)、[拡張と属性](https://tiptap.dev/docs/editor/extensions/custom-extensions/extend-existing)、[Table](https://tiptap.dev/docs/editor/extensions/nodes/table)、[TaskList](https://tiptap.dev/docs/editor/extensions/nodes/task-list)。
