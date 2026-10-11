@@ -41,6 +41,69 @@ test('untouched HTML is byte-exact, including unsupported blocks and attributes'
   assert.equal(document.querySelectorAll('img[src]').length, 0);
   assert.equal(document.querySelectorAll('[style*="text-align"]').length, 0);
 });
+test('saved body remains editable after Plane wraps it in a div, including repeated reopen/save', () => {
+  const code = '<pre class="editor-code-block" data-id="diagram"><code class="language-mermaid">flowchart LR\nA --&gt; B</code></pre>';
+  const first = open('<p class="editor-paragraph-block" data-id="paragraph">元の本文</p>' + code);
+  addText(first, '一回目');
+  let saved = `<div>${first.html()}</div>`;
+  for (const text of ['二回目', '三回目']) {
+    const reopened = open(saved);
+    assert.equal(reopened.editor.view.dom.querySelectorAll('.preserved-content').length, 0);
+    assert.match(reopened.editor.view.dom.textContent, /元の本文/);
+    let position;
+    reopened.editor.state.doc.descendants((node, pos) => {
+      if (node.isText && node.text.includes('元の本文')) position = pos;
+    });
+    reopened.editor.commands.insertContentAt(position, text);
+    saved = reopened.html();
+    const output = document.createElement('template'); output.innerHTML = saved;
+    assert.equal(output.content.firstElementChild.localName, 'div');
+    assert.match(output.content.querySelector('p').textContent, new RegExp(text));
+    assert.equal(output.content.querySelector('p').getAttribute('data-id'), 'paragraph');
+    assert.ok(saved.includes(code));
+    assert.ok(!saved.includes('data-plane-'));
+  }
+  assert.match(saved, /三回目二回目一回目元の本文/);
+});
+test('ordinary nested div containers retain their structure/attributes without applying them live', () => {
+  const html = '<div class="document" style="background:url(https://external.example/image)" onclick="bad()"><div data-id="section"><h2>見出し</h2><p>本文</p></div></div>';
+  const result = open(html);
+  assert.equal(result.html(), html);
+  assert.equal(result.editor.view.dom.querySelectorAll('.preserved-content').length, 0);
+  assert.equal(result.editor.view.dom.querySelectorAll('[onclick],[style*="url("]').length, 0);
+  let position;
+  result.editor.state.doc.descendants((node, pos) => {
+    if (node.isText && node.text === '本文') position = pos;
+  });
+  result.editor.commands.insertContentAt(position, '追記');
+  const output = document.createElement('template'); output.innerHTML = result.html();
+  assert.equal(output.content.querySelector('.document > div').getAttribute('data-id'), 'section');
+  assert.equal(output.content.querySelector('p').textContent, '追記本文');
+  assert.equal(output.content.firstElementChild.getAttribute('onclick'), 'bad()');
+  assert.equal(open(result.html()).editor.view.dom.querySelectorAll('.preserved-content').length, 0);
+});
+test('div text and empty div bodies have an editable paragraph', () => {
+  for (const html of ['<div>本文<br>続き</div>', '<div></div>']) {
+    const result = open(html);
+    assert.equal(result.html(), html);
+    assert.ok(result.editor.view.dom.querySelector('div > p'));
+    assert.equal(result.editor.view.dom.querySelectorAll('.preserved-content').length, 0);
+    result.editor.commands.insertContentAt(2, '追記');
+    assert.match(result.html(), /追記/);
+    assert.match(open(result.html()).editor.view.dom.textContent, /追記/);
+  }
+});
+test('div containers preserve custom atoms while surrounding rich content stays editable', () => {
+  const custom = '<div data-type="equation" data-latex="x^2">数式</div>';
+  const image = '<img src="https://external.example/image" onerror="bad()">';
+  const result = open(`<div><h2>見出し</h2><p>本文</p>${custom}${image}</div>`);
+  assert.equal(result.editor.view.dom.querySelectorAll('.preserved-content').length, 2);
+  assert.equal(result.editor.view.dom.querySelectorAll('img[src],[data-latex],[onerror]').length, 0);
+  result.editor.commands.insertContentAt(2, '追記');
+  assert.match(result.html(), /追記見出し/);
+  assert.ok(result.html().includes(custom)); assert.ok(result.html().includes(image));
+  assert.equal(open(result.html()).editor.view.dom.querySelectorAll('.preserved-content').length, 2);
+});
 test('editing surrounding text preserves Mermaid/tree language metadata, source and unknown attributes', () => {
   const html = '<p data-custom="keep">本文</p><pre data-language="mermaid" class="original"><code class="language-mermaid" data-code="keep">flowchart RL\nA["日本語"] --&gt; B\n</code></pre><pre class="language-tree"><code>.\n└── ++ 日本語.dart &lt;--[新規]</code></pre>';
   const result = open(html); addText(result);
@@ -142,6 +205,26 @@ test('title-only save forwards unchanged body, closes only after successful save
   view.click('Save work item'); await tick();
   assert.deepEqual(calls, [['更新後のタイトル', original, false]]);
   assert.equal(view.closes(), 1);
+});
+test('Save and reopening the edit sheet repeatedly updates a server-wrapped description', async () => {
+  let saved = '<p class="editor-paragraph-block" data-id="paragraph">元の本文</p>';
+  let saves = 0;
+  for (const text of ['一回目', '二回目', '三回目']) {
+    const view = ui(saved, async (_title, html, changed) => {
+      assert.equal(changed, true); saves++;
+      saved = html.startsWith('<div>') ? html : `<div>${html}</div>`;
+      return '';
+    });
+    const body = view.host.querySelector('.tiptap');
+    assert.equal(body.querySelectorAll('.preserved-content').length, 0);
+    body.querySelector('p').append(text);
+    body.dispatchEvent(new dom.window.InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+    await tick(); view.click('Save work item'); await tick();
+    assert.equal(view.closes(), 1);
+  }
+  assert.equal(saves, 3);
+  assert.match(saved, /元の本文一回目二回目三回目/);
+  assert.match(saved, /data-id="paragraph"/);
 });
 test('body save sends rendered formatting and a failed request retains title/body for explicit retry', async () => {
   const calls = [];

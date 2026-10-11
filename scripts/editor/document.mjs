@@ -12,9 +12,9 @@ export function safeLink(value) {
   } catch { return false; }
 }
 
-const knownTags = new Set('p h1 h2 h3 h4 h5 h6 blockquote ul ol li table tbody thead tfoot colgroup col tr td th pre code strong b em i u s strike del a br hr span'.split(' '));
+const knownTags = new Set('div p h1 h2 h3 h4 h5 h6 blockquote ul ol li table tbody thead tfoot colgroup col tr td th pre code strong b em i u s strike del a br hr span'.split(' '));
 const inlineTags = new Set('span img a strong b em i u s strike del code br'.split(' '));
-const types = 'paragraph heading blockquote bulletList orderedList listItem taskList taskItem table tableRow tableCell tableHeader codeBlock code bold italic underline strike link hardBreak horizontalRule originalSpan'.split(' ');
+const types = 'htmlContainer paragraph heading blockquote bulletList orderedList listItem taskList taskItem table tableRow tableCell tableHeader codeBlock code bold italic underline strike link hardBreak horizontalRule originalSpan'.split(' ');
 
 /** Import into an inert template. Original attributes and unsupported subtrees
  * stay in private records, never in the live editable DOM. They are restored
@@ -135,6 +135,14 @@ export function createDocumentEditor(element, originalHtml, onChange = () => {})
     parseHTML: () => [{ tag: 'span[data-plane-source]' }],
     renderHTML: ({ HTMLAttributes }) => ['span', HTMLAttributes, 0],
   });
+  // Plane may return the whole description inside a plain div. Keep that
+  // container in the schema so its children remain editable after save/reopen,
+  // while original attributes stay inert and custom data-type blocks stay atoms.
+  const htmlContainer = Node.create({
+    name: 'htmlContainer', group: 'block', content: 'block+', selectable: false,
+    parseHTML: () => [{ tag: 'div' }],
+    renderHTML: ({ HTMLAttributes }) => ['div', HTMLAttributes, 0],
+  });
   const codeBlock = CodeBlock.extend({
     renderHTML: ({ node, HTMLAttributes }) => ['pre', {
       ...HTMLAttributes,
@@ -150,7 +158,7 @@ export function createDocumentEditor(element, originalHtml, onChange = () => {})
           isAllowedUri: safeLink, HTMLAttributes: { target: null, rel: null } } }),
       codeBlock, TaskList, TaskItem.configure({ nested: true }),
       TableKit.configure({ table: { resizable: false } }),
-      originals, originalSpan, preserved(false), preserved(true),
+      originals, originalSpan, htmlContainer, preserved(false), preserved(true),
     ],
     editorProps: {
       attributes: { role: 'textbox', 'aria-label': 'Work item description', 'aria-multiline': 'true', spellcheck: 'true' },
